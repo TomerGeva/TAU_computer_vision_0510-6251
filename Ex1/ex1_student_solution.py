@@ -81,9 +81,38 @@ class Solution:
         Returns:
             The forward homography of the source image to its destination.
         """
-        # return new_image
-        """INSERT YOUR CODE HERE"""
-        pass
+        # ==============================================================================================================
+        # Local variables
+        # ==============================================================================================================
+        src_w, src_h, _ = src_image.shape
+        points       = np.array([[],[]])
+        yy, xx       = np.meshgrid(np.arange(dst_image_shape[0]), np.arange(dst_image_shape[1]))
+        # ==============================================================================================================
+        # Iterating over coordinates, performing the projection
+        # ==============================================================================================================
+        for ii in range(src_h):
+            for jj in range(src_w):
+                # --------------------------------------------------------------------------------------------------
+                # Applying the transformation
+                # --------------------------------------------------------------------------------------------------
+                vec = np.array([[jj],[ii],[1]])
+                dst = np.matmul(homography, vec)
+                # --------------------------------------------------------------------------------------------------
+                # Normalizing
+                # --------------------------------------------------------------------------------------------------
+                points = np.append(points, np.array([[dst[0,0]/dst[2,0]], [dst[1,0]/dst[2,0]]]), axis=1)
+        # ==============================================================================================================
+        # Interpolating
+        # ==============================================================================================================
+        values          = np.matrix.reshape(src_image,(-1, 3), order='C')
+        src_image_warp  = griddata(np.transpose(points), values, (yy, xx), method='linear')
+        # ==============================================================================================================
+        # Numerical rounding etc
+        # ==============================================================================================================
+        src_image_warp[np.isnan(src_image_warp)] = 0
+        src_image_warp[src_image_warp > 255]     = 255
+        src_image_warp = np.uint8(np.round(src_image_warp))
+        return src_image_warp
 
     @staticmethod
     def compute_forward_homography_fast(
@@ -112,9 +141,34 @@ class Solution:
         Returns:
             The forward homography of the source image to its destination.
         """
-        # return new_image
-        """INSERT YOUR CODE HERE"""
-        pass
+        # ==============================================================================================================
+        # Local variables
+        # ==============================================================================================================
+        src_w, src_h, _ = src_image.shape
+        values = np.matrix.reshape(src_image, (-1, 3), order='C')
+        xx, yy = np.meshgrid(np.arange(src_w), np.arange(src_h))
+        input_flat = np.concatenate((xx.reshape((1, -1)), yy.reshape((1, -1)), np.ones_like(xx.reshape((1, -1)))), axis=0)
+        yy, xx = np.meshgrid(np.arange(dst_image_shape[0]), np.arange(dst_image_shape[1]))
+        # ==============================================================================================================
+        # Computing transformation
+        # ==============================================================================================================
+        points = np.matmul(homography, input_flat)
+        points = points[0:2, :] / points[2, :]
+        # ==============================================================================================================
+        # Interpolating for exact grid location ONLY FOR RELEVANT LOCATIONS
+        # ==============================================================================================================
+        cond = np.all(points > -0.5, axis=0)
+        values_relevant = values[cond, :]
+        points_relevant = points[:, cond]
+        # src_image_warp = griddata(np.transpose(points_relevant), values_relevant, (yy, xx), method='linear')
+        src_image_warp = griddata(np.transpose(points), values, (yy, xx), method='linear')
+        # ==============================================================================================================
+        # Numerical rounding etc
+        # ==============================================================================================================
+        src_image_warp[np.isnan(src_image_warp)] = 0
+        src_image_warp[src_image_warp > 255] = 255
+        src_image_warp = np.uint8(np.round(src_image_warp))
+        return src_image_warp
 
     @staticmethod
     def test_homography(homography: np.ndarray,
