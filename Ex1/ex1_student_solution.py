@@ -157,11 +157,10 @@ class Solution:
         # ==============================================================================================================
         # Interpolating for exact grid location ONLY FOR RELEVANT LOCATIONS
         # ==============================================================================================================
-        cond = np.all(points > -0.5, axis=0)
+        cond = np.all(points > -1, axis=0)
         values_relevant = values[cond, :]
         points_relevant = points[:, cond]
-        # src_image_warp = griddata(np.transpose(points_relevant), values_relevant, (yy, xx), method='linear')
-        src_image_warp = griddata(np.transpose(points), values, (yy, xx), method='linear')
+        src_image_warp = griddata(np.transpose(points_relevant), values_relevant, (yy, xx), method='linear')
         # ==============================================================================================================
         # Numerical rounding etc
         # ==============================================================================================================
