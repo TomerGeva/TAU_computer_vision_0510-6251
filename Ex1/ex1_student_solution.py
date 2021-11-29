@@ -85,8 +85,10 @@ class Solution:
         # Local variables
         # ==============================================================================================================
         src_w, src_h, _ = src_image.shape
-        points       = np.array([[],[]])
+        points       = np.zeros((2, src_w * src_h))
         yy, xx       = np.meshgrid(np.arange(dst_image_shape[0]), np.arange(dst_image_shape[1]))
+        counter      = 0
+        values       = np.matrix.reshape(src_image, (-1, 3), order='C')
         # ==============================================================================================================
         # Iterating over coordinates, performing the projection
         # ==============================================================================================================
@@ -98,20 +100,23 @@ class Solution:
                 vec = np.array([[jj],[ii],[1]])
                 dst = np.matmul(homography, vec)
                 # --------------------------------------------------------------------------------------------------
-                # Normalizing
+                # Normalizing and placing in points
                 # --------------------------------------------------------------------------------------------------
-                points = np.append(points, np.array([[dst[0,0]/dst[2,0]], [dst[1,0]/dst[2,0]]]), axis=1)
+                points[:, counter] = [dst[0,0]/dst[2,0], dst[1,0]/dst[2,0]]
+                counter += 1
         # ==============================================================================================================
         # Interpolating
         # ==============================================================================================================
-        values          = np.matrix.reshape(src_image,(-1, 3), order='C')
-        src_image_warp  = griddata(np.transpose(points), values, (yy, xx), method='linear')
+        cond = np.all(points > -1, axis=0)
+        values_relevant = values[cond, :]
+        points_relevant = points[:, cond]
+        src_image_warp  = griddata(np.transpose(points_relevant), values_relevant, (yy, xx), method='linear')
         # ==============================================================================================================
         # Numerical rounding etc
         # ==============================================================================================================
         src_image_warp[np.isnan(src_image_warp)] = 0
         src_image_warp[src_image_warp > 255]     = 255
-        src_image_warp = np.uint8(np.round(src_image_warp))
+        src_image_warp = np.uint8(src_image_warp)
         return src_image_warp
 
     @staticmethod
