@@ -9,6 +9,7 @@ from collections import namedtuple
 from numpy.linalg import svd
 from scipy.interpolate import griddata
 
+from ex1_functions import clip_and_interp
 
 PadStruct = namedtuple('PadStruct',
                        ['pad_up', 'pad_down', 'pad_right', 'pad_left'])
@@ -46,12 +47,12 @@ class Solution:
         mul_points2     = np.transpose(np.insert(match_p_src * match_p_dst[1, :], range(0, np.size(match_p_src, axis=1)), 0, axis=1))
         i_points        = np.reshape(np.transpose(match_p_dst),(2*np.size(match_p_dst, axis=1), 1))
 
-        A = np.concatenate((-1*src_points1, -1*homogeneous1, -1*src_points2, -1*homogeneous2, mul_points1 + mul_points2, i_points), axis=1)
+        a_mat = np.concatenate((-1*src_points1, -1*homogeneous1, -1*src_points2, -1*homogeneous2, mul_points1 + mul_points2, i_points), axis=1)
 
         # ==============================================================================================================
         # Performing SVD
         # ==============================================================================================================
-        [_, _, v] = svd(A)
+        [_, _, v] = svd(a_mat)
         h = (v[-1].reshape((3, 3)))
         return h / h[-1, -1]
 
@@ -86,7 +87,6 @@ class Solution:
         # ==============================================================================================================
         src_w, src_h, _ = src_image.shape
         points       = np.zeros((2, src_w * src_h))
-        yy, xx       = np.meshgrid(np.arange(dst_image_shape[0]), np.arange(dst_image_shape[1]))
         counter      = 0
         values       = np.matrix.reshape(src_image, (-1, 3), order='C')
         # ==============================================================================================================
@@ -107,17 +107,7 @@ class Solution:
         # ==============================================================================================================
         # Interpolating
         # ==============================================================================================================
-        cond = np.all(points > -1, axis=0)
-        values_relevant = values[cond, :]
-        points_relevant = points[:, cond]
-        src_image_warp  = griddata(np.transpose(points_relevant), values_relevant, (yy, xx), method='linear')
-        # ==============================================================================================================
-        # Numerical rounding etc
-        # ==============================================================================================================
-        src_image_warp[np.isnan(src_image_warp)] = 0
-        src_image_warp[src_image_warp > 255]     = 255
-        src_image_warp = np.uint8(src_image_warp)
-        return src_image_warp
+        return clip_and_interp(points, values, dst_image_shape)
 
     @staticmethod
     def compute_forward_homography_fast(
@@ -153,7 +143,6 @@ class Solution:
         values = np.matrix.reshape(src_image, (-1, 3), order='C')
         xx, yy = np.meshgrid(np.arange(src_w), np.arange(src_h))
         input_flat = np.concatenate((xx.reshape((1, -1)), yy.reshape((1, -1)), np.ones_like(xx.reshape((1, -1)))), axis=0)
-        yy, xx = np.meshgrid(np.arange(dst_image_shape[0]), np.arange(dst_image_shape[1]))
         # ==============================================================================================================
         # Computing transformation
         # ==============================================================================================================
@@ -162,17 +151,7 @@ class Solution:
         # ==============================================================================================================
         # Interpolating for exact grid location ONLY FOR RELEVANT LOCATIONS
         # ==============================================================================================================
-        cond = np.all(points > -1, axis=0)
-        values_relevant = values[cond, :]
-        points_relevant = points[:, cond]
-        src_image_warp = griddata(np.transpose(points_relevant), values_relevant, (yy, xx), method='linear')
-        # ==============================================================================================================
-        # Numerical rounding etc
-        # ==============================================================================================================
-        src_image_warp[np.isnan(src_image_warp)] = 0
-        src_image_warp[src_image_warp > 255] = 255
-        src_image_warp = np.uint8(np.round(src_image_warp))
-        return src_image_warp
+        return clip_and_interp(points, values, dst_image_shape)
 
     @staticmethod
     def test_homography(homography: np.ndarray,
