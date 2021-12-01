@@ -88,7 +88,7 @@ class Solution:
         src_w, src_h, _ = src_image.shape
         points       = np.zeros((2, src_w * src_h))
         counter      = 0
-        values       = np.matrix.reshape(src_image, (-1, 3), order='C')
+        values       = np.matrix.reshape(src_image, (-1, 3), order='F')
         # ==============================================================================================================
         # Iterating over coordinates, performing the projection
         # ==============================================================================================================
@@ -97,7 +97,7 @@ class Solution:
                 # --------------------------------------------------------------------------------------------------
                 # Applying the transformation
                 # --------------------------------------------------------------------------------------------------
-                vec = np.array([[jj],[ii],[1]])
+                vec = np.array([[ii],[jj],[1]])
                 dst = np.matmul(homography, vec)
                 # --------------------------------------------------------------------------------------------------
                 # Normalizing and placing in points
@@ -140,8 +140,8 @@ class Solution:
         # Local variables
         # ==============================================================================================================
         src_w, src_h, _ = src_image.shape
-        values = np.matrix.reshape(src_image, (-1, 3), order='C')
-        xx, yy = np.meshgrid(np.arange(src_w), np.arange(src_h))
+        values = np.matrix.reshape(src_image, (-1, 3), order='F')
+        yy, xx = np.meshgrid(np.arange(src_w), np.arange(src_h))
         input_flat = np.concatenate((xx.reshape((1, -1)), yy.reshape((1, -1)), np.ones_like(xx.reshape((1, -1)))), axis=0)
         # ==============================================================================================================
         # Computing transformation
