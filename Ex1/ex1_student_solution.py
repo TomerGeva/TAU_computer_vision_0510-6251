@@ -9,7 +9,7 @@ from collections import namedtuple
 from numpy.linalg import svd
 from scipy.interpolate import griddata
 
-from ex1_functions import clip_and_interp
+from ex1_functions import clip_and_interp, transform_and_compute_distances_squared
 
 PadStruct = namedtuple('PadStruct',
                        ['pad_up', 'pad_down', 'pad_right', 'pad_left'])
@@ -179,19 +179,17 @@ class Solution:
             return dist_mse = 10 ** 9.
         """
         # ==============================================================================================================
-        # Computing transformation
+        # Local variable
         # ==============================================================================================================
         input_flat = np.concatenate((match_p_src, np.ones((1, match_p_src.shape[1]))), axis=0)
-        points = np.matmul(homography, input_flat)
-        points = points[0:2, :] / points[2, :]
         # ==============================================================================================================
-        # Computing distances
+        # Computing  transformation and distances
         # ==============================================================================================================
-        dist_squared = (points[0,:] - match_p_dst[0,:])**2 + (points[1,:] - match_p_dst[1:])**2
+        dist_squared = transform_and_compute_distances_squared(homography, input_flat, match_p_dst)
         # ==============================================================================================================
         # Computing metrics
         # ==============================================================================================================
-        fit_percent = np.sum(dist_squared**0.5 < max_err) / match_p_src.shape[1]
+        fit_percent = np.sum(dist_squared ** 0.5 < max_err) / match_p_src.shape[1]
         dist_mse    = np.mean(dist_squared)
         return fit_percent, dist_mse
 
@@ -220,9 +218,21 @@ class Solution:
             The second entry is the matching points form the destination
             image (shape 2xD; D as above).
         """
-        # return mp_src_meets_model, mp_dst_meets_model
-        """INSERT YOUR CODE HERE"""
-        pass
+        # ==============================================================================================================
+        # Local variable
+        # ==============================================================================================================
+        input_flat = np.concatenate((match_p_src, np.ones((1, match_p_src.shape[1]))), axis=0)
+        # ==============================================================================================================
+        # Computing  transformation and distances
+        # ==============================================================================================================
+        dist_squared = transform_and_compute_distances_squared(homography, input_flat, match_p_dst)
+        # ==============================================================================================================
+        # Isolating inliers
+        # ==============================================================================================================
+        cond = dist_squared ** 0.5 < max_err
+        mp_src_meets_model = match_p_src[:, np.squeeze(cond)]
+        mp_dst_meets_model = match_p_dst[:, np.squeeze(cond)]
+        return mp_src_meets_model, mp_dst_meets_model
 
     def compute_homography(self,
                            match_p_src: np.ndarray,
