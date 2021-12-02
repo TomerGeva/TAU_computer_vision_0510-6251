@@ -178,9 +178,22 @@ class Solution:
             inliers). In edge case where the number of inliers is zero,
             return dist_mse = 10 ** 9.
         """
-        # return fit_percent, dist_mse
-        """INSERT YOUR CODE HERE"""
-        pass
+        # ==============================================================================================================
+        # Computing transformation
+        # ==============================================================================================================
+        input_flat = np.concatenate((match_p_src, np.ones((1, match_p_src.shape[1]))), axis=0)
+        points = np.matmul(homography, input_flat)
+        points = points[0:2, :] / points[2, :]
+        # ==============================================================================================================
+        # Computing distances
+        # ==============================================================================================================
+        dist_squared = (points[0,:] - match_p_dst[0,:])**2 + (points[1,:] - match_p_dst[1:])**2
+        # ==============================================================================================================
+        # Computing metrics
+        # ==============================================================================================================
+        fit_percent = np.sum(dist_squared**0.5 < max_err) / match_p_src.shape[1]
+        dist_mse    = np.mean(dist_squared)
+        return fit_percent, dist_mse
 
     @staticmethod
     def meet_the_model_points(homography: np.ndarray,
@@ -242,7 +255,6 @@ class Solution:
         # # number of RANSAC iterations (+1 to avoid the case where w=1)
         # k = int(np.ceil(np.log(1 - p) / np.log(1 - w ** n))) + 1
         # return homography
-        """INSERT YOUR CODE HERE"""
         pass
 
     @staticmethod
