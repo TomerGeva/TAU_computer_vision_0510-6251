@@ -9,7 +9,7 @@ from collections import namedtuple
 from numpy.linalg import svd
 from scipy.interpolate import griddata
 
-from ex1_functions import clip_and_interp, transform_and_compute_distances_squared
+from ex1_functions import clip_and_place, transform_and_compute_distances_squared, clip_and_interp
 
 PadStruct = namedtuple('PadStruct',
                        ['pad_up', 'pad_down', 'pad_right', 'pad_left'])
@@ -105,9 +105,9 @@ class Solution:
                 points[:, counter] = [dst[0,0]/dst[2,0], dst[1,0]/dst[2,0]]
                 counter += 1
         # ==============================================================================================================
-        # Interpolating
+        # Placing the points from the source in their new locations
         # ==============================================================================================================
-        return clip_and_interp(points, values, dst_image_shape)
+        return clip_and_place(points, values, dst_image_shape)
 
     @staticmethod
     def compute_forward_homography_fast(
@@ -147,11 +147,12 @@ class Solution:
         # Computing transformation
         # ==============================================================================================================
         points = np.matmul(homography, input_flat)
-        points = points[0:2, :] / points[2, :]
+        points_homogeneous = points[0:2, :] / points[2, :]
+        del points
         # ==============================================================================================================
         # Interpolating for exact grid location ONLY FOR RELEVANT LOCATIONS
         # ==============================================================================================================
-        return clip_and_interp(points, values, dst_image_shape)
+        return clip_and_place(points_homogeneous, values, dst_image_shape)
 
     @staticmethod
     def test_homography(homography: np.ndarray,
@@ -189,8 +190,9 @@ class Solution:
         # ==============================================================================================================
         # Computing metrics
         # ==============================================================================================================
-        fit_percent = np.sum(dist_squared ** 0.5 < max_err) / match_p_src.shape[1]
-        dist_mse    = np.mean(dist_squared)
+        cond = dist_squared ** 0.5 < max_err
+        fit_percent = np.sum(cond) / match_p_src.shape[1]
+        dist_mse    = np.mean(dist_squared[cond])
         return fit_percent, dist_mse
 
     @staticmethod

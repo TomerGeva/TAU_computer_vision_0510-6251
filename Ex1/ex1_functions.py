@@ -2,6 +2,27 @@ import numpy as np
 from scipy.interpolate import griddata
 
 
+def clip_relevant(points: np.ndarray,
+                  values: np.ndarray,
+                  dst_image_shape: tuple,
+                  gt_half: bool = False) -> tuple:
+    """
+    :param points: 2 X (src_w * src_h) array where the ith column represents a transformed coordinates
+    :param values: (src_w * src_h) X 3 array where the ith row represents a RGB pixel of the source picture
+    :param dst_image_shape: Shape of the wanted picture after interpolation
+    :param gt_half: if true sets the threshold on -0.5 and not -1
+    :return: only relevant points and matching values
+    """
+    threshold = -0.5 if gt_half else -1
+    cond = np.all(np.concatenate((points > threshold,
+                                  np.expand_dims(points[0,:] < (dst_image_shape[1] - (1 + threshold)), axis=0),
+                                  np.expand_dims(points[1,:] < (dst_image_shape[0] - (1 + threshold)), axis=0)),
+                                 axis=0),
+                  axis=0)
+    values_relevant = values[cond, :]
+    points_relevant = points[:, cond]
+    return points_relevant, values_relevant
+
 def clip_and_interp(points: np.ndarray,
                     values: np.ndarray,
                     dst_image_shape: tuple) -> np.ndarray:
@@ -18,9 +39,7 @@ def clip_and_interp(points: np.ndarray,
     # ==============================================================================================================
     # Clipping only relevant point for speedup
     # ==============================================================================================================
-    cond = np.all(points > -1, axis=0)
-    values_relevant = values[cond, :]
-    points_relevant = points[:, cond]
+    points_relevant, values_relevant = clip_relevant(points, values, dst_image_shape)
     # ==============================================================================================================
     # Interpolating
     # ==============================================================================================================
@@ -32,6 +51,33 @@ def clip_and_interp(points: np.ndarray,
     src_image_warp[src_image_warp > 255] = 255
     src_image_warp = np.uint8(src_image_warp)
     return src_image_warp
+
+
+def clip_and_place(points: np.ndarray,
+                   values: np.ndarray,
+                   dst_image_shape: tuple) -> np.ndarray:
+    """
+    :param points: 2 X (src_w * src_h) array where the ith column represents a transformed coordinates
+    :param values: (src_w * src_h) X 3 array where the ith row represents a RGB pixel of the source picture
+    :param dst_image_shape: Shape of the wanted picture after interpolation
+    :return: ndarray with the size of the destination picture, where all the transformed points are placed
+    """
+    # ==============================================================================================================
+    # Local variables
+    # ==============================================================================================================
+    dest_img = np.zeros(dst_image_shape).astype(int)
+    # ==============================================================================================================
+    # Clipping only relevant point for speedup
+    # ==============================================================================================================
+    points_relevant, values_relevant = clip_relevant(points, values, dst_image_shape, gt_half=True)
+    # ==============================================================================================================
+    # Rounding and placing
+    # ==============================================================================================================
+    points_relevant = (np.round(points_relevant)).astype(int)
+    dest_img[points_relevant[1,:], points_relevant[0,:], :] = np.uint8(values_relevant)
+    return dest_img
+
+
 
 
 def transform_and_compute_distances_squared(homography: np.ndarray,
