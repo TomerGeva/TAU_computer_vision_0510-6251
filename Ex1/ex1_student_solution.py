@@ -192,7 +192,7 @@ class Solution:
         # ==============================================================================================================
         cond = dist_squared ** 0.5 < max_err
         fit_percent = np.sum(cond) / match_p_src.shape[1]
-        dist_mse    = np.mean(dist_squared[cond])
+        dist_mse    =  [np.mean(dist_squared[cond]), 10 ** 9][np.sum(cond) == 0] #Maorn: if no points, return 10^9
         return fit_percent, dist_mse
 
     @staticmethod
@@ -255,19 +255,37 @@ class Solution:
             homography: Projective transformation matrix from src to dst.
         """
         # # use class notations:
-        # w = inliers_percent
-        # # t = max_err
+        w = inliers_percent
+        t = max_err
         # # p = parameter determining the probability of the algorithm to
         # # succeed
-        # p = 0.99
+        p = 0.99
         # # the minimal probability of points which meets with the model
-        # d = 0.5
+        d = 0.5
         # # number of points sufficient to compute the model
-        # n = 4
+        n = 4
         # # number of RANSAC iterations (+1 to avoid the case where w=1)
-        # k = int(np.ceil(np.log(1 - p) / np.log(1 - w ** n))) + 1
-        # return homography
-        pass
+        k = int(np.ceil(np.log(1 - p) / np.log(1 - w ** n))) + 1
+        N = match_p_dst.shape[1]
+
+        iter = 0
+        best_homography =  self.compute_homography_naive(match_p_src, match_p_dst) #very initial homography - in case RANSAC parameters are bad
+        best_error = 10**9
+        while iter < k:
+            rand_indices = np.random.choice(N, n, False)
+            model = self.compute_homography_naive(match_p_src[:,rand_indices], match_p_dst[:,rand_indices])
+            cond = np.delete(np.arange(N),rand_indices)
+            meet_the_model_points = self.meet_the_model_points(model,match_p_src[:,cond],match_p_dst[:,cond],max_err)
+            #TODO Maorn : need to define a lost of also_inliers = meet_the_model_points\points[rand_indices] (slash here is exclude)
+            [fit_percent,dist_mse] = self.test_homography(model, match_p_src, match_p_dst,max_err)
+            if fit_percent >=d and dist_mse < best_error:
+                best_homography = model
+                best_error = dist_mse
+
+            iter += 1
+        homography = best_homography
+        return homography
+
 
     @staticmethod
     def compute_backward_mapping(

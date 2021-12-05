@@ -132,6 +132,32 @@ def main():
     print('RANSAC Homography Test {:5.4f} sec'.format(toc(tt)))
     print([fit_percent, dist_mse])
 
+    # Plot ransac homography with forward mapping, fast implementation
+    tt = time.time()
+    transformed_image_fast = solution.compute_forward_homography_fast(
+        homography=ransac_homography,
+        src_image=src_img,
+        dst_image_shape=dst_img.shape)
+
+    print('Ransac Homography Fast computation takes {:5.4f} sec'.format(toc(tt)))
+    plt.figure()
+    forward_panorama_fast_plot = plt.imshow(transformed_image_fast)
+    plt.title('Forward Homography Fast implementation')
+    plt.show()
+
+    # Plot ransac homography with backward mapping, fast implementation
+    tt = time.time()
+    transformed_image_fast = solution.compute_backward_mapping(
+        homography=ransac_homography,
+        src_image=src_img,
+        dst_image_shape=dst_img.shape)
+
+    print('Ransac Homography Fast computation takes {:5.4f} sec'.format(toc(tt)))
+    plt.figure()
+    forward_panorama_fast_plot = plt.imshow(transformed_image_fast)
+    plt.title('Forward Homography Fast implementation')
+    plt.show()
+
     # Build panorama
     tt = tic()
     img_pan = solution.panorama(src_img,
@@ -147,7 +173,6 @@ def main():
     course_panorama_plot = plt.imshow(img_pan)
     plt.title('Great Panorama')
     # plt.show()
-    plt.show()
 
 
 def your_images_loader():
