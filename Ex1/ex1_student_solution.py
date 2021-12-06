@@ -254,37 +254,57 @@ class Solution:
         Returns:
             homography: Projective transformation matrix from src to dst.
         """
-        # # use class notations:
+        # ==============================================================================================================
+        # Local variables, using class notations:
+        # ==============================================================================================================
         w = inliers_percent
         t = max_err
-        # # p = parameter determining the probability of the algorithm to
-        # # succeed
-        p = 0.99
-        # # the minimal probability of points which meets with the model
-        d = 0.5
-        # # number of points sufficient to compute the model
-        n = 4
-        # # number of RANSAC iterations (+1 to avoid the case where w=1)
-        k = int(np.ceil(np.log(1 - p) / np.log(1 - w ** n))) + 1
+        p = 0.99  # parameter determining the probability of the algorithm to succeed
+        d = 0.5   # the minimal probability of points which meets with the model
+        n = 4     # number of points sufficient to compute the model
+        k = int(np.ceil(np.log(1 - p) / np.log(1 - w ** n))) + 1 # number of RANSAC iterations (+1 to avoid the case where w=1)
         N = match_p_dst.shape[1]
 
-        iter = 0
+        init_mse    = 10**9
+        # ==============================================================================================================
+        # Initial conditions
+        # ==============================================================================================================
         best_homography =  self.compute_homography_naive(match_p_src, match_p_dst) #very initial homography - in case RANSAC parameters are bad
-        best_error = 10**9
-        while iter < k:
+        best_mse      = init_mse
+        best_fit        = d
+        src_best        = match_p_src
+        dst_best        = match_p_dst
+        # ==============================================================================================================
+        # Running k iterations
+        # ==============================================================================================================
+        for _ in range(k):
+            # ------------------------------------------------------------------------------------------------------
+            # Raffling 4 coordinate pairs
+            # ------------------------------------------------------------------------------------------------------
             rand_indices = np.random.choice(N, n, False)
+            # ------------------------------------------------------------------------------------------------------
+            # Computing homography for this set
+            # ------------------------------------------------------------------------------------------------------
             model = self.compute_homography_naive(match_p_src[:,rand_indices], match_p_dst[:,rand_indices])
-            cond = np.delete(np.arange(N),rand_indices)
-            meet_the_model_points = self.meet_the_model_points(model,match_p_src[:,cond],match_p_dst[:,cond],max_err)
-            #TODO Maorn : need to define a lost of also_inliers = meet_the_model_points\points[rand_indices] (slash here is exclude)
+            # cond = np.delete(np.arange(N),rand_indices)
+            # ------------------------------------------------------------------------------------------------------
+            # Testing the wellness of the model
+            # ------------------------------------------------------------------------------------------------------
             [fit_percent,dist_mse] = self.test_homography(model, match_p_src, match_p_dst,max_err)
-            if fit_percent >=d and dist_mse < best_error:
-                best_homography = model
-                best_error = dist_mse
+            # ------------------------------------------------------------------------------------------------------
+            # If the model is the best so far, updates
+            # ------------------------------------------------------------------------------------------------------
+            if (fit_percent > best_fit) or (fit_percent == best_fit and dist_mse < best_mse):
+                src_best, dst_best  = self.meet_the_model_points(model, match_p_src, match_p_dst, max_err)
+                best_mse            = dist_mse
+                best_fit            = fit_percent
 
-            iter += 1
-        homography = best_homography
-        return homography
+        # ==============================================================================================================
+        # Computing homography with all the inliers of the best model
+        # ==============================================================================================================
+        if best_mse < init_mse:
+            best_homography = self.compute_homography_naive(src_best, dst_best)
+        return best_homography
 
 
     @staticmethod
