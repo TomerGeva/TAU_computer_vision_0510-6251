@@ -9,7 +9,8 @@ from collections import namedtuple
 from numpy.linalg import svd
 from scipy.interpolate import griddata
 
-from ex1_functions import clip_and_place, transform_and_compute_distances_squared, clip_and_interp
+from ex1_functions import clip_and_place, transform_and_compute_distances_squared, clip_and_interp, \
+    clip_relevant_and_place_backwad
 
 PadStruct = namedtuple('PadStruct',
                        ['pad_up', 'pad_down', 'pad_right', 'pad_left'])
@@ -139,9 +140,9 @@ class Solution:
         # ==============================================================================================================
         # Local variables
         # ==============================================================================================================
-        src_w, src_h, _ = src_image.shape
+        src_h, src_w, _ = src_image.shape
         values = np.matrix.reshape(src_image, (-1, 3), order='F')
-        yy, xx = np.meshgrid(np.arange(src_w), np.arange(src_h))
+        yy, xx = np.meshgrid(np.arange(src_h), np.arange(src_w))
         input_flat = np.concatenate((xx.reshape((1, -1)), yy.reshape((1, -1)), np.ones_like(xx.reshape((1, -1)))), axis=0)
         # ==============================================================================================================
         # Computing transformation
@@ -191,8 +192,13 @@ class Solution:
         # Computing metrics
         # ==============================================================================================================
         cond = dist_squared ** 0.5 < max_err
+
         fit_percent = np.sum(cond) / match_p_src.shape[1]
-        dist_mse    =  [np.mean(dist_squared[cond]), 10 ** 9][np.sum(cond) == 0] #Maorn: if no points, return 10^9
+        if np.sum(cond) == 0:
+            dist_mse = 10 ** 9 #if no points, return 10^9
+        else:
+            dist_mse = np.mean(dist_squared[cond])
+
         return fit_percent, dist_mse
 
     @staticmethod
@@ -286,11 +292,11 @@ class Solution:
             # Computing homography for this set
             # ------------------------------------------------------------------------------------------------------
             model = self.compute_homography_naive(match_p_src[:,rand_indices], match_p_dst[:,rand_indices])
-            # cond = np.delete(np.arange(N),rand_indices)
+            cond = np.delete(np.arange(N),rand_indices)
             # ------------------------------------------------------------------------------------------------------
             # Testing the wellness of the model
             # ------------------------------------------------------------------------------------------------------
-            [fit_percent,dist_mse] = self.test_homography(model, match_p_src, match_p_dst,max_err)
+            [fit_percent,dist_mse] = self.test_homography(model, match_p_src[:,cond], match_p_dst[:,cond],max_err)
             # ------------------------------------------------------------------------------------------------------
             # If the model is the best so far, updates
             # ------------------------------------------------------------------------------------------------------
@@ -332,10 +338,27 @@ class Solution:
         Returns:
             The source image backward warped to the destination coordinates.
         """
+        # ==============================================================================================================
+        # Local variables
+        # ==============================================================================================================
+        src_w, src_h, _ = src_image.shape
+        values = np.matrix.reshape(src_image, (-1, 3), order='F')
+        yy, xx = np.meshgrid(np.arange(dst_image_shape[0]), np.arange(dst_image_shape[1]))
+        dst_meshgrid_flat = np.concatenate((xx.reshape((1, -1)), yy.reshape((1, -1)), np.ones_like(xx.reshape((1, -1)))),
+                                    axis=0)
+        # ==============================================================================================================
+        # Computing transformation
+        # ==============================================================================================================
 
-        # return backward_warp
-        """INSERT YOUR CODE HERE"""
-        pass
+        points = np.matmul(backward_projective_homography, dst_meshgrid_flat)
+        points_homogeneous = points[0:2, :] / points[2, :]
+        del points
+        # ==============================================================================================================
+        # Clip relevant points and interpolate for exact grid location ONLY FOR RELEVANT LOCATIONS
+        # ==============================================================================================================
+        backward_warp =  clip_relevant_and_place_backwad(points_homogeneous, src_image, dst_meshgrid_flat, dst_image_shape)
+
+        return backward_warp
 
     @staticmethod
     def find_panorama_shape(src_image: np.ndarray,
@@ -425,9 +448,11 @@ class Solution:
             A new homography which includes the backward homography and the
             translation.
         """
-        # return final_homography
-        """INSERT YOUR CODE HERE"""
-        pass
+       # translation = np.concatenate(np.eye(2),np.array([pad_up,pad_left]))
+        final_homography = backward_homography
+
+        return final_homography
+
 
     def panorama(self,
                  src_image: np.ndarray,
@@ -468,6 +493,34 @@ class Solution:
             A panorama image.
 
         """
-        # return np.clip(img_panorama, 0, 255).astype(np.uint8)
-        """INSERT YOUR CODE HERE"""
-        pass
+        # ==============================================================================================================
+        # Find the RANSAC Homography
+        # ==============================================================================================================
+        ransac_homography = self.compute_homography(match_p_src,
+                                                        match_p_dst,
+                                                        inliers_percent,
+                                                        max_err)
+        # ==============================================================================================================
+        # Find the Panorama shape and needed padding
+        # ==============================================================================================================
+        [panorama_h, panorama_w, pad_struct] = self.find_panorama_shape(src_image,
+                                                                        dst_image,
+                                                                        ransac_homography)
+        # ==============================================================================================================
+        # Find the Proper Backward Homography with needed translation
+        # ==============================================================================================================
+        backward_homography = self.add_translation_to_backward_homography(np.linalg.inv(ransac_homography),
+                                                                          pad_struct.pad_left,
+                                                                          pad_struct.pad_up)
+        # ==============================================================================================================
+        # Execute Backward Warp to create [panorama_h X panorama_w] image with the src
+        # ==============================================================================================================
+        src_image_to_panorama_backward_warp = self.compute_backward_mapping(backward_homography,
+                                                                            src_image,
+                                                                            dst_image.shape)
+                                                                          #  dst_image_shape=(panorama_h, panorama_w, 3))
+        # ==============================================================================================================
+        # Locate dst pixels on top of panorama
+        # ==============================================================================================================
+        img_panorama = src_image_to_panorama_backward_warp #TODO: add dst pixels
+        return np.clip(img_panorama, 0, 255).astype(np.uint8)
