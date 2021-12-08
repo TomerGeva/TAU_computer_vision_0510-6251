@@ -9,8 +9,7 @@ from collections import namedtuple
 from numpy.linalg import svd
 from scipy.interpolate import griddata
 
-from ex1_functions import clip_and_place, transform_and_compute_distances_squared, clip_and_interp, \
-    clip_relevant_and_place_backwad
+from ex1_functions import clip_and_place, transform_and_compute_distances_squared, clip_and_interp_backward
 
 PadStruct = namedtuple('PadStruct',
                        ['pad_up', 'pad_down', 'pad_right', 'pad_left'])
@@ -56,9 +55,6 @@ class Solution:
         [_, _, v] = svd(a_mat)
         h = (v[-1].reshape((3, 3)))
         return h / h[-1, -1]
-
-
-
 
     @staticmethod
     def compute_forward_homography_slow(
@@ -312,7 +308,6 @@ class Solution:
             best_homography = self.compute_homography_naive(src_best, dst_best)
         return best_homography
 
-
     @staticmethod
     def compute_backward_mapping(
             backward_projective_homography: np.ndarray,
@@ -342,21 +337,18 @@ class Solution:
         # Local variables
         # ==============================================================================================================
         src_w, src_h, _ = src_image.shape
-        values = np.matrix.reshape(src_image, (-1, 3), order='F')
         yy, xx = np.meshgrid(np.arange(dst_image_shape[0]), np.arange(dst_image_shape[1]))
-        dst_meshgrid_flat = np.concatenate((xx.reshape((1, -1)), yy.reshape((1, -1)), np.ones_like(xx.reshape((1, -1)))),
-                                    axis=0)
+        dst_meshgrid_flat = np.concatenate((xx.reshape((1, -1)), yy.reshape((1, -1)), np.ones_like(xx.reshape((1, -1)))), axis=0)
         # ==============================================================================================================
         # Computing transformation
         # ==============================================================================================================
-
         points = np.matmul(backward_projective_homography, dst_meshgrid_flat)
         points_homogeneous = points[0:2, :] / points[2, :]
         del points
         # ==============================================================================================================
         # Clip relevant points and interpolate for exact grid location ONLY FOR RELEVANT LOCATIONS
         # ==============================================================================================================
-        backward_warp =  clip_relevant_and_place_backwad(points_homogeneous, src_image, dst_meshgrid_flat, dst_image_shape)
+        backward_warp =  clip_and_interp_backward(points_homogeneous, src_image, dst_meshgrid_flat, dst_image_shape)
 
         return backward_warp
 
@@ -391,34 +383,50 @@ class Solution:
             padStruct = a struct with the padding measures along each axes
             (row,col).
         """
+        # ==============================================================================================================
+        # Local Variables
+        # ==============================================================================================================
+        pad_up = pad_down = pad_right = pad_left = 0
         src_rows_num, src_cols_num, _ = src_image.shape
         dst_rows_num, dst_cols_num, _ = dst_image.shape
-        src_edges = {}
-        src_edges['upper left corner'] = np.array([1, 1, 1])
-        src_edges['upper right corner'] = np.array([src_cols_num, 1, 1])
-        src_edges['lower left corner'] = np.array([1, src_rows_num, 1])
-        src_edges['lower right corner'] = \
-            np.array([src_cols_num, src_rows_num, 1])
+        src_edges = {'upper_left':  np.array([[0], [0], [1]]),
+                     'upper_right': np.array([[src_cols_num - 1], [0], [1]]),
+                     'lower_left':  np.array([[0], [src_rows_num - 1], [1]]),
+                     'lower_right': np.array([[src_cols_num - 1], [src_rows_num - 1], [1]])}
         transformed_edges = {}
+        # ==============================================================================================================
+        # Transforming the edges to the destination coordinates
+        # ==============================================================================================================
         for corner_name, corner_location in src_edges.items():
             transformed_edges[corner_name] = homography @ corner_location
             transformed_edges[corner_name] /= transformed_edges[corner_name][-1]
-        pad_up = pad_down = pad_right = pad_left = 0
+        # ==============================================================================================================
+        # Extracting the needed padding
+        # ==============================================================================================================
         for corner_name, corner_location in transformed_edges.items():
-            if corner_location[1] < 1:
+            if corner_location[1] < 0:
+                # --------------------------------------------------------------------------------------------------
                 # pad up
-                pad_up = max([pad_up, abs(corner_location[1])])
-            if corner_location[0] > dst_cols_num:
+                # --------------------------------------------------------------------------------------------------
+                pad_up = max([pad_up, 1 + abs(corner_location[1])])
+            if corner_location[0] >= dst_cols_num:
+                # --------------------------------------------------------------------------------------------------
                 # pad right
-                pad_right = max([pad_right,
-                                 corner_location[0] - dst_cols_num])
-            if corner_location[0] < 1:
+                # --------------------------------------------------------------------------------------------------
+                pad_right = max([pad_right,1 +  corner_location[0] - dst_cols_num])
+            if corner_location[0] < 0:
+                # --------------------------------------------------------------------------------------------------
                 # pad left
-                pad_left = max([pad_left, abs(corner_location[0])])
-            if corner_location[1] > dst_rows_num:
+                # --------------------------------------------------------------------------------------------------
+                pad_left = max([pad_left, 1 + abs(corner_location[0])])
+            if corner_location[1] >= dst_rows_num:
+                # --------------------------------------------------------------------------------------------------
                 # pad down
-                pad_down = max([pad_down,
-                                corner_location[1] - dst_rows_num])
+                # --------------------------------------------------------------------------------------------------
+                pad_down = max([pad_down, 1 + corner_location[1] - dst_rows_num])
+        # ==============================================================================================================
+        # Computing panorama size
+        # ==============================================================================================================
         panorama_cols_num = int(dst_cols_num + pad_right + pad_left)
         panorama_rows_num = int(dst_rows_num + pad_up + pad_down)
         pad_struct = PadStruct(pad_up=int(pad_up),
@@ -448,9 +456,11 @@ class Solution:
             A new homography which includes the backward homography and the
             translation.
         """
-       # translation = np.concatenate(np.eye(2),np.array([pad_up,pad_left]))
-        final_homography = backward_homography
-
+        translation = np.concatenate((np.eye(3,2),np.array([[-1 * pad_left], [-1 * pad_up], [1]])), axis=1)
+        # translation = 0
+        final_homography = np.matmul(backward_homography, translation)
+        final_homography /=  final_homography[2,2]
+        # final_homography = backward_homography + translation
         return final_homography
 
 
@@ -497,9 +507,9 @@ class Solution:
         # Find the RANSAC Homography
         # ==============================================================================================================
         ransac_homography = self.compute_homography(match_p_src,
-                                                        match_p_dst,
-                                                        inliers_percent,
-                                                        max_err)
+                                                    match_p_dst,
+                                                    inliers_percent,
+                                                    max_err)
         # ==============================================================================================================
         # Find the Panorama shape and needed padding
         # ==============================================================================================================
@@ -517,10 +527,14 @@ class Solution:
         # ==============================================================================================================
         src_image_to_panorama_backward_warp = self.compute_backward_mapping(backward_homography,
                                                                             src_image,
-                                                                            dst_image.shape)
-                                                                          #  dst_image_shape=(panorama_h, panorama_w, 3))
+                                                                            (panorama_h, panorama_w, 3))
         # ==============================================================================================================
-        # Locate dst pixels on top of panorama
+        # Adding the destination pixels on top of the transformed source
         # ==============================================================================================================
-        img_panorama = src_image_to_panorama_backward_warp #TODO: add dst pixels
-        return np.clip(img_panorama, 0, 255).astype(np.uint8)
+        img_panorama = src_image_to_panorama_backward_warp
+        xx, yy = np.meshgrid(np.arange(dst_image.shape[1]), np.arange(dst_image.shape[0]))
+        yy += pad_struct.pad_up
+        xx += pad_struct.pad_left
+        img_panorama[yy, xx, :] = dst_image
+
+        return img_panorama

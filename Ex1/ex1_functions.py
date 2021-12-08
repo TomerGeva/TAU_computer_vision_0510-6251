@@ -76,15 +76,15 @@ def clip_and_place(points: np.ndarray,
     points_relevant = (np.round(points_relevant)).astype(int)
     dest_img[points_relevant[1,:], points_relevant[0,:], :] = np.uint8(values_relevant)
     return dest_img
-# TODO: rename to bettter name
 
-def clip_relevant_and_place_backwad(points: np.ndarray,
-                   src_image: np.ndarray,
-                   flat_meshgrid_dst: np.ndarray ,
-                   dst_image_shape: tuple) -> np.ndarray:
+def clip_and_interp_backward(points: np.ndarray,
+                             src_image: np.ndarray,
+                             flat_meshgrid_dst: np.ndarray,
+                             dst_image_shape: tuple) -> np.ndarray:
     """
     :param points: 2 X (dst_w * dst_h) array where the ith column represents a transformed coordinates
     :param src_image: source image to determine the RGB value of the relevant points
+    :param flat_meshgrid_dst:
     :param dst_image_shape: Shape of the wanted picture after interpolation
     :return: ndarray with the size of the destination picture, where all the transformed points are placed
     """
@@ -101,16 +101,15 @@ def clip_relevant_and_place_backwad(points: np.ndarray,
                                   np.expand_dims(points[1, :] < (src_image.shape[0] - (1 + threshold)), axis=0)),
                                  axis=0),
                   axis=0)
-    points_relevant = points[:, cond] # TODO: keep double, no int
-    # values_relevant = src_image[points_relevant[1,:], points_relevant[0,:], :] #TODO: Use Bi' interpolation
-    yy, xx = np.meshgrid(np.arange(src_image.shape[1]), np.arange(src_image.shape[0])) #Source img coordinate meshgrid
+    points_relevant = points[:, cond]
+    xx, yy = np.meshgrid(np.arange(src_image.shape[1]), np.arange(src_image.shape[0])) #Source img coordinate meshgrid
     input_flat = np.concatenate((xx.reshape((1, -1)), yy.reshape((1, -1))))
     src_values_in_src_coor = np.matrix.reshape(src_image, (-1, 3), order='C')
     # ==============================================================================================================
     # Interpolating
     # ==============================================================================================================
-    values_relevant = griddata(input_flat, src_values_in_src_coor, points_relevant, method='linear')
-    values_relevant[np.isnan(values_relevant)] = 0
+    values_relevant = griddata(np.transpose(input_flat), src_values_in_src_coor, np.transpose(points_relevant), method='cubic', fill_value=0)
+    # values_relevant[np.isnan(values_relevant)] = 0
     values_relevant[values_relevant > 255] = 255
     points_relevant_dst = flat_meshgrid_dst[:, cond]
     # ==============================================================================================================
