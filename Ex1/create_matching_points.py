@@ -5,8 +5,8 @@ import scipy.io
 
 global source, dest, match_p_dst, match_p_src, frame, frame2
 
-source = cv2.imread('src_test.jpg')
-dest = cv2.imread('dst_test.jpg')
+source = cv2.imread('Option1/src_test.jpg')
+dest = cv2.imread('Option1/dst_test.jpg')
 
 frame = source
 frame2 = dest
@@ -52,5 +52,5 @@ match_p_src = np.array(match_p_src, dtype=float)
 match_p_dst = np.array(match_p_dst, dtype=float)
 cv2.destroyAllWindows()
 matches_test = {'match_p_dst': match_p_dst.T, 'match_p_src': match_p_src.T}
-scipy.io.savemat("matches_test.mat", matches_test)
+scipy.io.savemat("Option1/matches_test.mat", matches_test)
 print('saved to matches_test.mat')
