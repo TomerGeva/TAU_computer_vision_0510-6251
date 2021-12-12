@@ -266,13 +266,14 @@ class Solution:
         n = 4     # number of points sufficient to compute the model
         k = int(np.ceil(np.log(1 - p) / np.log(1 - w ** n))) + 1 # number of RANSAC iterations (+1 to avoid the case where w=1)
         N = match_p_dst.shape[1]
-
-        init_mse    = 10**9
+        init_mse = 10**9
+        src_best = dst_best = None
+        np.random.seed(43)
         # ==============================================================================================================
         # Initial conditions
         # ==============================================================================================================
         best_homography =  self.compute_homography_naive(match_p_src, match_p_dst) #very initial homography - in case RANSAC parameters are bad
-        best_mse      = init_mse
+        best_mse        = init_mse
         best_fit        = d
         # ==============================================================================================================
         # Running k iterations
@@ -286,20 +287,28 @@ class Solution:
             # Computing homography for this set
             # ------------------------------------------------------------------------------------------------------
             model = self.compute_homography_naive(match_p_src[:,rand_indices], match_p_dst[:,rand_indices])
-            cond = np.delete(np.arange(N),rand_indices)
+            # cond = np.delete(np.arange(N),rand_indices)
             # ------------------------------------------------------------------------------------------------------
             # Testing the wellness of the model
             # ------------------------------------------------------------------------------------------------------
-            [fit_percent,dist_mse] = self.test_homography(model, match_p_src[:,cond], match_p_dst[:,cond],t)
+            # [fit_percent,dist_mse] = self.test_homography(model, match_p_src[:,cond], match_p_dst[:,cond],t)
+            [fit_percent,dist_mse] = self.test_homography(model, match_p_src, match_p_dst,t)
             # ------------------------------------------------------------------------------------------------------
             # If the model is the best so far, updates
             # ------------------------------------------------------------------------------------------------------
             if (fit_percent > best_fit) or (fit_percent == best_fit and dist_mse < best_mse):
-               # src_best, dst_best  = self.meet_the_model_points(model, match_p_src, match_p_dst, t)
+                src_best, dst_best  = self.meet_the_model_points(model, match_p_src, match_p_dst, t)
                 best_mse            = dist_mse
                 best_fit            = fit_percent
-                best_homography = model
-
+                best_homography     = model
+        # ==============================================================================================================
+        # Creating a homography with all the best inliers
+        # ==============================================================================================================
+        if src_best is not None:
+            model_temp = self.compute_homography_naive(src_best, dst_best)
+            [fit_percent, dist_mse] = self.test_homography(model_temp, match_p_src, match_p_dst, t)
+            if (fit_percent > best_fit) or (fit_percent == best_fit and dist_mse < best_mse):
+                return model_temp
         return best_homography
 
     @staticmethod
