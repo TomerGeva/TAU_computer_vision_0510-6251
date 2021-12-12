@@ -274,8 +274,6 @@ class Solution:
         best_homography =  self.compute_homography_naive(match_p_src, match_p_dst) #very initial homography - in case RANSAC parameters are bad
         best_mse      = init_mse
         best_fit        = d
-        src_best        = match_p_src
-        dst_best        = match_p_dst
         # ==============================================================================================================
         # Running k iterations
         # ==============================================================================================================
@@ -292,20 +290,16 @@ class Solution:
             # ------------------------------------------------------------------------------------------------------
             # Testing the wellness of the model
             # ------------------------------------------------------------------------------------------------------
-            [fit_percent,dist_mse] = self.test_homography(model, match_p_src[:,cond], match_p_dst[:,cond],max_err)
+            [fit_percent,dist_mse] = self.test_homography(model, match_p_src[:,cond], match_p_dst[:,cond],t)
             # ------------------------------------------------------------------------------------------------------
             # If the model is the best so far, updates
             # ------------------------------------------------------------------------------------------------------
             if (fit_percent > best_fit) or (fit_percent == best_fit and dist_mse < best_mse):
-                src_best, dst_best  = self.meet_the_model_points(model, match_p_src, match_p_dst, max_err)
+               # src_best, dst_best  = self.meet_the_model_points(model, match_p_src, match_p_dst, t)
                 best_mse            = dist_mse
                 best_fit            = fit_percent
+                best_homography = model
 
-        # ==============================================================================================================
-        # Computing homography with all the inliers of the best model
-        # ==============================================================================================================
-        if best_mse < init_mse:
-            best_homography = self.compute_homography_naive(src_best, dst_best)
         return best_homography
 
     @staticmethod

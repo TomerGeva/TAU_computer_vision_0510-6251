@@ -179,8 +179,8 @@ def your_images_main():
     # Student Files
     # first run "create_matching_points.py" with your own images to create a mat
     # file with the matching coordinates.
-    max_err = 25  # <<<<< YOU MAY CHANGE THIS
-    inliers_percent = 0.8  # <<<<< YOU MAY CHANGE THIS
+    max_err = 40  # <<<<< YOU MAY CHANGE THIS
+    inliers_percent = 0.88  # <<<<< YOU MAY CHANGE THIS
 
     src_img_test, dst_img_test, match_p_src, match_p_dst = your_images_loader()
     homography = solution.compute_homography(match_p_src, match_p_dst,
