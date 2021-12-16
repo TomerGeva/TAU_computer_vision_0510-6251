@@ -27,18 +27,33 @@ class Solution:
             possible disparity values. The tensor shape should be:
             HxWx(2*dsp_range+1).
         """
+        # ==============================================================================================================
+        # Local Variables
+        # ==============================================================================================================
         num_of_rows, num_of_cols = left_image.shape[0], left_image.shape[1]
         disparity_values = range(-dsp_range, dsp_range+1)
         ssdd_tensor = np.zeros((num_of_rows,
                                 num_of_cols,
                                 len(disparity_values)))
+        kernel = np.ones((win_size,win_size))
         # ==============================================================================================================
-        # Create padded version of imaged
+        # Iterating over the disparity vector, computing SSD
         # ==============================================================================================================
-
-        padded_left_image = np.pad(left_image, ((1, 1), (1, 1), (0, 0)), 'constant', constant_values=((0, 0), (0, 0), (0, 0)))
-        padded_right_image = np.pad(right_image, ((1, 1), (1, 1), (0, 0)), 'constant', constant_values=((0, 0), (0, 0), (0, 0)))
-
+        for ii, disparity in enumerate(disparity_values):
+            # ------------------------------------------------------------------------------------------------------
+            # Preparing the images for the convolution
+            # ------------------------------------------------------------------------------------------------------
+            right_image_roll    = np.roll(right_image, disparity, axis=0)
+            images_diff_squared = np.power(left_image - right_image_roll, 2)
+            # ------------------------------------------------------------------------------------------------------
+            # Performing the convolution one dimension at a time since we can not use pytorch :/
+            # ------------------------------------------------------------------------------------------------------
+            for jj in range(left_image.shape[2]):
+                channel = images_diff_squared[:,:,jj]
+                ssdd_tensor[:, :, ii] += convolve2d(channel, kernel, mode='same')
+        # ==============================================================================================================
+        # Normalizing to range
+        # ==============================================================================================================
         ssdd_tensor -= ssdd_tensor.min()
         ssdd_tensor /= ssdd_tensor.max()
         ssdd_tensor *= 255.0
