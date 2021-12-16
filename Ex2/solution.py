@@ -43,7 +43,7 @@ class Solution:
             # ------------------------------------------------------------------------------------------------------
             # Preparing the images for the convolution
             # ------------------------------------------------------------------------------------------------------
-            right_image_roll    = np.roll(right_image, disparity, axis=0)
+            right_image_roll    = np.roll(right_image, disparity, axis=1)
             images_diff_squared = np.power(left_image - right_image_roll, 2)
             # ------------------------------------------------------------------------------------------------------
             # Performing the convolution one dimension at a time since we can not use pytorch :/
