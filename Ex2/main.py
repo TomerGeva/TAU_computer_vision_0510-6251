@@ -5,7 +5,6 @@ import matplotlib.image as mpimg
 
 from solution import Solution
 
-
 COST1 = 0.5
 COST2 = 3.0
 WIN_SIZE = 3
@@ -49,6 +48,11 @@ def load_data(is_your_data=False):
 
 
 def main():
+    COST1 = 0.5 #TODO: why cannot use variables from head of file (seems not global)
+    COST2 = 3.0
+    WIN_SIZE = 3
+    DISPARITY_RANGE = 20
+
     left_image, right_image = load_data()
     solution = Solution()
     # Compute Sum-Square-Diff distance

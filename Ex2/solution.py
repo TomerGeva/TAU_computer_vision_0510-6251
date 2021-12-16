@@ -1,7 +1,7 @@
 """Stereo matching."""
 import numpy as np
 from scipy.signal import convolve2d
-
+global WIN_SIZE
 
 class Solution:
     def __init__(self):
@@ -32,7 +32,13 @@ class Solution:
         ssdd_tensor = np.zeros((num_of_rows,
                                 num_of_cols,
                                 len(disparity_values)))
-        """INSERT YOUR CODE HERE"""
+        # ==============================================================================================================
+        # Create padded version of imaged
+        # ==============================================================================================================
+
+        padded_left_image = np.pad(left_image, ((1, 1), (1, 1), (0, 0)), 'constant', constant_values=((0, 0), (0, 0), (0, 0)))
+        padded_right_image = np.pad(right_image, ((1, 1), (1, 1), (0, 0)), 'constant', constant_values=((0, 0), (0, 0), (0, 0)))
+
         ssdd_tensor -= ssdd_tensor.min()
         ssdd_tensor /= ssdd_tensor.max()
         ssdd_tensor *= 255.0
