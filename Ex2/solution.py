@@ -105,7 +105,12 @@ class Solution:
         # ==============================================================================================================
         # Local Variables
         # ==============================================================================================================
-        num_labels, num_of_cols = c_slice.shape[1], c_slice.shape[0]
+        try:
+            num_labels, num_of_cols = c_slice.shape[1], c_slice.shape[0]
+        except IndexError:
+            num_labels  = c_slice.shape[0]
+            num_of_cols    = 1
+            c_slice = np.expand_dims(c_slice, axis=0)
         l_slice                 = np.zeros((num_labels, num_of_cols))
         yy, xx                  = np.meshgrid(np.arange(num_labels), np.arange(num_labels))
         # ==============================================================================================================
@@ -139,7 +144,101 @@ class Solution:
         return l_slice
 
     @staticmethod
-    def extract_slices(ssdd_tensor, direction):
+    def extract_slices(ssdd_tensor: np.ndarray, direction: int, transpose:bool = False, fliplr:bool = False, flipud:bool = False):
+        """
+        :param ssdd_tensor: 3D SSDD tensor with shape (H, W, label_size)
+        :param direction: a number between 1 and 2:
+            1. left     -> right
+            2. top left -> bottom right
+        :param transpose: if true, transposes the indices in the dictionary
+        :param fliplr: if true, flips the indices in the dictionary left -> right
+        :param flipud: if true, flips the indices in the dictionary top  -> bottom
+        :return:
+            1. A dictionary with number keys where each key matches a slice
+            2. A dictionary with number keys where each key matches a slice's indices in the photo
+        """
+        # ==============================================================================================================
+        # Local Variables
+        # ==============================================================================================================
+        height, width, labels_num = ssdd_tensor.shape
+        slices_dict    = {}
+        indices_dict   = {}
+        xx, yy         = np.meshgrid(np.arange(width), np.arange(height))
+        # ==============================================================================================================
+        # Performing according to each direction
+        # ==============================================================================================================
+        if direction == 1:
+            for ii in range(height):
+                slices_dict[ii]      = ssdd_tensor[ii,:,:]
+                # --------------------------------------------------------------------------------------------------
+                # Dealing with transposed input
+                # --------------------------------------------------------------------------------------------------
+                if  not transpose:
+                    indices_dict[ii] = np.array(list(zip(yy[ii, :], xx[ii, :])))
+                else:
+                    indices_dict[ii] = np.array(list(zip(xx[ii, :], yy[ii, :])))
+                # --------------------------------------------------------------------------------------------------
+                # Dealing with flipped input left -> right
+                # --------------------------------------------------------------------------------------------------
+                if fliplr:
+                    indices_dict[ii][:, 1] = width - 1 - indices_dict[ii][:, 1]
+                # --------------------------------------------------------------------------------------------------
+                # Dealing with flipped input top -> bottom
+                # --------------------------------------------------------------------------------------------------
+                if flipud:
+                    if not transpose:
+                        indices_dict[ii][:, 0] = height - 1 - indices_dict[ii][:, 0]
+                    else:
+                        indices_dict[ii][:, 0] = width - 1 - indices_dict[ii][:, 0]
+
+        elif direction == 2:
+            counter = 0
+            for ii in range(np.max([height, width])):
+                indices_temp = np.array(list(zip(range(np.max([height, width])), range(np.max([height, width])))))[ii:,:]
+                indices_temp[:,1] -= ii
+                indices_dict[counter]   = indices_temp[indices_temp[:,0] < height, :] if height <= width else indices_temp[indices_temp[:,1] < width, :]
+                slices_dict[counter]    = ssdd_tensor[indices_dict[counter][:, 0], indices_dict[counter][:, 1], :]
+                # --------------------------------------------------------------------------------------------------
+                # Dealing with transposed input
+                # --------------------------------------------------------------------------------------------------
+                if transpose:
+                    indices_dict[counter] = np.fliplr(indices_dict[counter])
+                # --------------------------------------------------------------------------------------------------
+                # Dealing with flipped input left -> right
+                # --------------------------------------------------------------------------------------------------
+                if fliplr:
+                    indices_dict[counter][:, 1] = width - 1 - indices_dict[counter][:, 1]
+                # --------------------------------------------------------------------------------------------------
+                # Dealing with flipped input top -> bottom
+                # --------------------------------------------------------------------------------------------------
+                if flipud:
+                    indices_dict[counter][:, 0] = height - 1 - indices_dict[counter][:, 0]
+                counter += 1
+                if ii > 0:
+                    indices_temp = np.array(list(zip(range(np.max([height, width])), range(np.max([height, width])))))[ii:,:]
+                    indices_temp[:, 0] -= ii
+                    indices_dict[counter]   = indices_temp[indices_temp[:,0] < height, :] if height <= width else indices_temp[indices_temp[:,1] < width, :]
+                    slices_dict[counter]    = ssdd_tensor[indices_dict[counter][:, 0], indices_dict[counter][:, 1], :]
+                    # ----------------------------------------------------------------------------------------------
+                    # Dealing with transposed input
+                    # ----------------------------------------------------------------------------------------------
+                    if transpose:
+                        indices_dict[counter] = np.fliplr(indices_dict[counter])
+                    # ----------------------------------------------------------------------------------------------
+                    # Dealing with flipped input left -> right
+                    # ----------------------------------------------------------------------------------------------
+                    if fliplr:
+                        indices_dict[counter][:, 1] = width - 1 - indices_dict[counter][:, 1]
+                    # ----------------------------------------------------------------------------------------------
+                    # Dealing with flipped input top -> bottom
+                    # ----------------------------------------------------------------------------------------------
+                    if flipud:
+                        indices_dict[counter][:, 0] = height - 1 - indices_dict[counter][:, 0]
+                    counter += 1
+
+        return slices_dict, indices_dict
+
+    def orient_direction_and_extract_slices(self,ssdd_tensor: np.ndarray, direction: int):
         """
         :param ssdd_tensor: 3D SSDD tensor with shape (H, W, label_size)
         :param direction: a number between 1 and 8:
@@ -151,25 +250,41 @@ class Solution:
             6. bot right -> top left
             7. bot       -> top
             8. bot left  -> top right
-        :return:
-            1. A dictionary with number keys where each key matches a slice
-            2. A dictionary with number keys where each key matches a slice's indices in the photo
+        :return: The function orents the ssdd tensor such that the slices will be taken from left to right or across the
+                 main diagonal. this means:
+                     1. nothing
+                     2. nothing
+                     3. transpose
+                     4. flip left -> right
+                     5. flip left -> right
+                     6. flip top -> bottom + flip left -> right
+                     7. transpose + flip left -> right
+                     8. flip top -> bottom
+                 After performing the needed orientation change, the function calls the extract_slices method
         """
-        # ==============================================================================================================
-        # Local Variables
-        # ==============================================================================================================
-        height, width, labels_num = ssdd_tensor.shape
-        slices_dict    = {}
-        indices_dict   = {}
-        yy, xx         = np.meshgrid(np.arange(width), np.arange(height))
-        # ==============================================================================================================
-        # Performing according to each direction
-        # ==============================================================================================================
         if direction == 1:
-            for ii in range(height):
-                slices_dict[ii]    = np.squeeze(ssdd_tensor[ii,:,:])
-                indices_dict[ii]   = np.array(list(zip(xx[ii,:], yy[ii,:])))
-        return slices_dict, indices_dict
+            return self.extract_slices(ssdd_tensor, 1)
+        elif direction == 2:
+            return self.extract_slices(ssdd_tensor, 2)
+        elif direction == 3:
+            ssdd_tensor_transformed = np.moveaxis(ssdd_tensor, [0,1,2], [1,0,2])
+            return self.extract_slices(ssdd_tensor_transformed, 1, transpose=True)
+        elif direction == 4:
+            ssdd_tensor_transformed = np.fliplr(ssdd_tensor)
+            return self.extract_slices(ssdd_tensor_transformed, 2, fliplr=True)
+        elif direction == 5:
+            ssdd_tensor_transformed = np.fliplr(ssdd_tensor)
+            return self.extract_slices(ssdd_tensor_transformed, 1, fliplr=True)
+        if direction == 6:
+            ssdd_tensor_transformed = np.fliplr(np.flipud(ssdd_tensor))
+            return self.extract_slices(ssdd_tensor_transformed, 2, fliplr=True, flipud=True)
+        elif direction == 7:
+            ssdd_tensor_transformed = np.moveaxis(np.flipud(ssdd_tensor), [0,1,2], [1,0,2])
+            return self.extract_slices(ssdd_tensor_transformed, 1, transpose=True, flipud=True)
+        elif direction == 8:
+            ssdd_tensor_transformed = np.flipud(ssdd_tensor)
+            return self.extract_slices(ssdd_tensor_transformed, 2, flipud=True)
+
 
     def dp_labeling(self,
                     ssdd_tensor: np.ndarray,
@@ -196,11 +311,11 @@ class Solution:
         # Local Variables
         # ==============================================================================================================
         l = np.zeros_like(ssdd_tensor)
-        slices_dict, indices_dict = self.extract_slices(ssdd_tensor, 1)
+        slices_dict, indices_dict = self.orient_direction_and_extract_slices(ssdd_tensor, 1)
         # ==============================================================================================================
         # Running the forward MLSE computation in a for loop ONLY because this is requested in the exercise
         # ==============================================================================================================
-        for ii in np.arange(0, ssdd_tensor.shape[0], 1):
+        for ii in np.arange(0, len(slices_dict), 1):
             slice    = slices_dict[ii]
             indices  =indices_dict[ii]
             l[indices[:,0], indices[:,1]] = np.transpose(self.dp_grade_slice(np.squeeze(slice), p1, p2))
