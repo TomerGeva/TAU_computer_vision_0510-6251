@@ -285,11 +285,11 @@ class Solution:
             ssdd_tensor_transformed = np.flipud(ssdd_tensor)
             return self.extract_slices(ssdd_tensor_transformed, 2, flipud=True)
 
-
     def dp_labeling(self,
                     ssdd_tensor: np.ndarray,
                     p1: float,
-                    p2: float) -> np.ndarray:
+                    p2: float,
+                    direction:int = 1) -> np.ndarray:
         """Estimate a depth map using Dynamic Programming.
 
         (1) Call dp_grade_slice on each row slice of the ssdd tensor.
@@ -304,6 +304,8 @@ class Solution:
             2*dsp_range + 1 possible disparity values.
             p1: penalty for taking disparity value with 1 offset.
             p2: penalty for taking disparity value more than 2 offset.
+            direction: integer depiction of the orientation of the dynamic programing. see documentation of
+                       "orient_direction_and_extract_slices" API for more
         Returns:
             Dynamic Programming depth estimation matrix of shape HxW.
         """
@@ -311,7 +313,7 @@ class Solution:
         # Local Variables
         # ==============================================================================================================
         l = np.zeros_like(ssdd_tensor)
-        slices_dict, indices_dict = self.orient_direction_and_extract_slices(ssdd_tensor, 1)
+        slices_dict, indices_dict = self.orient_direction_and_extract_slices(ssdd_tensor, direction)
         # ==============================================================================================================
         # Running the forward MLSE computation in a for loop ONLY because this is requested in the exercise
         # ==============================================================================================================
@@ -355,7 +357,32 @@ class Solution:
         num_of_directions = 8
         l = np.zeros_like(ssdd_tensor)
         direction_to_slice = {}
-        """INSERT YOUR CODE HERE"""
+        for ii in range(num_of_directions):
+            direction_to_slice[ii+1] = self.dp_labeling(ssdd_tensor, p1, p2, direction=ii+1)
+
+        if False:
+            import matplotlib.pyplot as plt
+            from main import load_data
+            left_image, _ = load_data()
+            fig, axes = plt.subplots(3,3, sharex=True)
+            axes[1, 0].imshow(direction_to_slice[1])
+            axes[1, 0].set_title('Direction 1')
+            axes[0, 0].imshow(direction_to_slice[2])
+            axes[0, 0].set_title(f'Direction 2')
+            axes[0, 1].imshow(direction_to_slice[3])
+            axes[0, 1].set_title(f'Direction 3')
+            axes[0, 2].imshow(direction_to_slice[4])
+            axes[0, 2].set_title(f'Direction 4')
+            axes[1, 2].imshow(direction_to_slice[5])
+            axes[1, 2].set_title(f'Direction 5')
+            axes[2, 2].imshow(direction_to_slice[6])
+            axes[2, 2].set_title(f'Direction 6')
+            axes[2, 1].imshow(direction_to_slice[7])
+            axes[2, 1].set_title(f'Direction 7')
+            axes[2, 0].imshow(direction_to_slice[8])
+            axes[2, 0].set_title(f'Direction 8')
+            axes[1, 1].imshow(left_image)
+            axes[1, 1].set_title(f'Your Left Image')
         return direction_to_slice
 
     def sgm_labeling(self, ssdd_tensor: np.ndarray, p1: float, p2: float):
