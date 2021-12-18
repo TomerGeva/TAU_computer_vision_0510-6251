@@ -26,6 +26,10 @@ class Solution:
             window of size win_size X win_size, for the 2*dsp_range + 1
             possible disparity values. The tensor shape should be:
             HxWx(2*dsp_range+1).
+
+            right = np.expand_dims(np.array([[1, 1, 1, 1, 1], [2, 2, 2, 2, 2], [3, 3, 3, 3, 3], [4, 4, 4, 4, 4]]), axis=2)
+            left = np.expand_dims(np.array([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15], [16, 17, 18, 19, 20]]), axis=2)
+            ssdd = solution.ssd_distance(left.astype(np.float64), right.astype(np.float64), win_size=WIN_SIZE, dsp_range=2)
         """
         # ==============================================================================================================
         # Local Variables
@@ -37,14 +41,19 @@ class Solution:
                                 len(disparity_values)))
         kernel = np.ones((win_size,win_size))
         # ==============================================================================================================
+        # Padding the right image along the x axis
+        # ==============================================================================================================
+        right_image_pad = np.pad(right_image, ((0,0), (dsp_range,dsp_range), (0,0)))
+        # ==============================================================================================================
         # Iterating over the disparity vector, computing SSD
         # ==============================================================================================================
         for ii, disparity in enumerate(disparity_values):
             # ------------------------------------------------------------------------------------------------------
             # Preparing the images for the convolution
             # ------------------------------------------------------------------------------------------------------
-            right_image_roll    = np.roll(right_image, disparity, axis=1)
-            images_diff_squared = np.power(left_image - right_image_roll, 2)
+            # right_image_roll    = np.roll(right_image, disparity, axis=1)
+            # images_diff_squared = np.power(left_image - right_image_roll, 2)
+            images_diff_squared = np.power(left_image - right_image_pad[:,ii:ii+right_image.shape[1]], 2)
             # ------------------------------------------------------------------------------------------------------
             # Performing the convolution one dimension at a time since we can not use pytorch :/
             # ------------------------------------------------------------------------------------------------------
@@ -93,10 +102,74 @@ class Solution:
             Scores slice which for each column and disparity value states the
             score of the best route.
         """
-        num_labels, num_of_cols = c_slice.shape[0], c_slice.shape[1]
-        l_slice = np.zeros((num_labels, num_of_cols))
-        """INSERT YOUR CODE HERE"""
+        # ==============================================================================================================
+        # Local Variables
+        # ==============================================================================================================
+        num_labels, num_of_cols = c_slice.shape[1], c_slice.shape[0]
+        l_slice                 = np.zeros((num_labels, num_of_cols))
+        yy, xx                  = np.meshgrid(np.arange(num_labels), np.arange(num_labels))
+        # ==============================================================================================================
+        # Filling the loss matrix in a for loop since each column requires the previous column
+        # ==============================================================================================================
+        for col , c_clise_col in enumerate(c_slice):
+            if col == 0:
+                l_slice[:, col] = c_clise_col
+            else:
+                # --------------------------------------------------------------------------------------------------
+                # Computing the transition matrix
+                # --------------------------------------------------------------------------------------------------
+                # **********************************************************************************************
+                # Filling initial values without penalties
+                # **********************************************************************************************
+                transition_matrix = np.tile(l_slice[:, col-1], [num_labels,1])
+                # **********************************************************************************************
+                # Adding P1 for deviation from the main diagonal by +-1
+                # **********************************************************************************************
+                transition_matrix[np.abs(yy-xx) == 1] += p1
+                # **********************************************************************************************
+                # Adding P2 for deviation from the main diagonal by +-2 or more
+                # **********************************************************************************************
+                transition_matrix[np.abs(yy - xx) >= 2] += p2
+                # --------------------------------------------------------------------------------------------------
+                # Inserting the minimum value matching each label in the mlse matrix
+                # --------------------------------------------------------------------------------------------------
+                #          C_{slice}(d, col)  +         M(d,col)                  - min(L(:,col-1))
+                l_slice[:, col] = c_clise_col + np.min(transition_matrix, axis=1) - np.min(l_slice[:,col-1])
+
         return l_slice
+
+    @staticmethod
+    def extrace_slices(ssdd_tensor, direction):
+        """
+        :param ssdd_tensor: 3D SSDD tensor with shape (H, W, label_size)
+        :param direction: a number between 1 and 8:
+            1. left      -> right
+            2. top left  -> bot right
+            3. top       -> bot
+            4. top right -> bot left
+            5. right     -> left
+            6. bot right -> top left
+            7. bot       -> top
+            8. bot left  -> top right
+        :return:
+            1. A dictionary with number keys where each key matches a slice
+            2. A dictionary with number keys where each key matches a slice's indices in the photo
+        """
+        # ==============================================================================================================
+        # Local Variables
+        # ==============================================================================================================
+        height, width, labels_num = ssdd_tensor.shape
+        slices_dict    = {}
+        indices_dict   = {}
+        yy, xx         = np.meshgrid(np.arange(width), np.arange(height))
+        # ==============================================================================================================
+        # Performing according to each direction
+        # ==============================================================================================================
+        if direction == 1:
+            for ii in range(height):
+                slices_dict[ii]    = np.squeeze(ssdd_tensor[ii,:,:])
+                indices_dict[ii]   = np.array(list(zip(xx[ii,:], yy[ii,:])))
+        return slices_dict, indices_dict
 
     def dp_labeling(self,
                     ssdd_tensor: np.ndarray,
@@ -119,8 +192,21 @@ class Solution:
         Returns:
             Dynamic Programming depth estimation matrix of shape HxW.
         """
+        # ==============================================================================================================
+        # Local Variables
+        # ==============================================================================================================
         l = np.zeros_like(ssdd_tensor)
-        """INSERT YOUR CODE HERE"""
+        slices_dict, indices_dict = self.extrace_slices(ssdd_tensor, 1)
+        # ==============================================================================================================
+        # Running the forward MLSE computation in a for loop ONLY because this is requested in the exercise
+        # ==============================================================================================================
+        for ii in np.arange(0, ssdd_tensor.shape[0], 1):
+            slice    = slices_dict[ii]
+            indices  =indices_dict[ii]
+            l[indices[:,0], indices[:,1]] = np.transpose(self.dp_grade_slice(np.squeeze(slice), p1, p2))
+        # ==============================================================================================================
+        # Labeling in the backward process of the MLSE
+        # ==============================================================================================================
         return self.naive_labeling(l)
 
     def dp_labeling_per_direction(self,
