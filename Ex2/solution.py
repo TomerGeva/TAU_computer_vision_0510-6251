@@ -139,7 +139,7 @@ class Solution:
         return l_slice
 
     @staticmethod
-    def extrace_slices(ssdd_tensor, direction):
+    def extract_slices(ssdd_tensor, direction):
         """
         :param ssdd_tensor: 3D SSDD tensor with shape (H, W, label_size)
         :param direction: a number between 1 and 8:
@@ -196,7 +196,7 @@ class Solution:
         # Local Variables
         # ==============================================================================================================
         l = np.zeros_like(ssdd_tensor)
-        slices_dict, indices_dict = self.extrace_slices(ssdd_tensor, 1)
+        slices_dict, indices_dict = self.extract_slices(ssdd_tensor, 1)
         # ==============================================================================================================
         # Running the forward MLSE computation in a for loop ONLY because this is requested in the exercise
         # ==============================================================================================================
