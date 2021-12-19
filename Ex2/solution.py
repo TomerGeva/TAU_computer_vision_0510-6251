@@ -1,7 +1,9 @@
 """Stereo matching."""
 import numpy as np
 from scipy.signal import convolve2d
+
 global WIN_SIZE
+
 
 class Solution:
     def __init__(self):
@@ -35,15 +37,15 @@ class Solution:
         # Local Variables
         # ==============================================================================================================
         num_of_rows, num_of_cols = left_image.shape[0], left_image.shape[1]
-        disparity_values = range(-dsp_range, dsp_range+1)
+        disparity_values = range(-dsp_range, dsp_range + 1)
         ssdd_tensor = np.zeros((num_of_rows,
                                 num_of_cols,
                                 len(disparity_values)))
-        kernel = np.ones((win_size,win_size))
+        kernel = np.ones((win_size, win_size))
         # ==============================================================================================================
         # Padding the right image along the x axis
         # ==============================================================================================================
-        right_image_pad = np.pad(right_image, ((0,0), (dsp_range,dsp_range), (0,0)))
+        right_image_pad = np.pad(right_image, ((0, 0), (dsp_range, dsp_range), (0, 0)))
         # ==============================================================================================================
         # Iterating over the disparity vector, computing SSD
         # ==============================================================================================================
@@ -53,12 +55,12 @@ class Solution:
             # ------------------------------------------------------------------------------------------------------
             # right_image_roll    = np.roll(right_image, disparity, axis=1)
             # images_diff_squared = np.power(left_image - right_image_roll, 2)
-            images_diff_squared = np.power(left_image - right_image_pad[:,ii:ii+right_image.shape[1]], 2)
+            images_diff_squared = np.power(left_image - right_image_pad[:, ii:ii + right_image.shape[1]], 2)
             # ------------------------------------------------------------------------------------------------------
             # Performing the convolution one dimension at a time since we can not use pytorch :/
             # ------------------------------------------------------------------------------------------------------
             for jj in range(left_image.shape[2]):
-                channel = images_diff_squared[:,:,jj]
+                channel = images_diff_squared[:, :, jj]
                 ssdd_tensor[:, :, ii] += convolve2d(channel, kernel, mode='same')
         # ==============================================================================================================
         # Normalizing to range
@@ -108,15 +110,15 @@ class Solution:
         try:
             num_labels, num_of_cols = c_slice.shape[1], c_slice.shape[0]
         except IndexError:
-            num_labels  = c_slice.shape[0]
-            num_of_cols    = 1
+            num_labels = c_slice.shape[0]
+            num_of_cols = 1
             c_slice = np.expand_dims(c_slice, axis=0)
-        l_slice                 = np.zeros((num_labels, num_of_cols))
-        yy, xx                  = np.meshgrid(np.arange(num_labels), np.arange(num_labels))
+        l_slice = np.zeros((num_labels, num_of_cols))
+        yy, xx = np.meshgrid(np.arange(num_labels), np.arange(num_labels))
         # ==============================================================================================================
         # Filling the loss matrix in a for loop since each column requires the previous column
         # ==============================================================================================================
-        for col , c_clise_col in enumerate(c_slice):
+        for col, c_clise_col in enumerate(c_slice):
             if col == 0:
                 l_slice[:, col] = c_clise_col
             else:
@@ -126,11 +128,11 @@ class Solution:
                 # **********************************************************************************************
                 # Filling initial values without penalties
                 # **********************************************************************************************
-                transition_matrix = np.tile(l_slice[:, col-1], [num_labels,1])
+                transition_matrix = np.tile(l_slice[:, col - 1], [num_labels, 1])
                 # **********************************************************************************************
                 # Adding P1 for deviation from the main diagonal by +-1
                 # **********************************************************************************************
-                transition_matrix[np.abs(yy-xx) == 1] += p1
+                transition_matrix[np.abs(yy - xx) == 1] += p1
                 # **********************************************************************************************
                 # Adding P2 for deviation from the main diagonal by +-2 or more
                 # **********************************************************************************************
@@ -139,12 +141,13 @@ class Solution:
                 # Inserting the minimum value matching each label in the mlse matrix
                 # --------------------------------------------------------------------------------------------------
                 #          C_{slice}(d, col)  +         M(d,col)                  - min(L(:,col-1))
-                l_slice[:, col] = c_clise_col + np.min(transition_matrix, axis=1) - np.min(l_slice[:,col-1])
+                l_slice[:, col] = c_clise_col + np.min(transition_matrix, axis=1) - np.min(l_slice[:, col - 1])
 
         return l_slice
 
     @staticmethod
-    def extract_slices(ssdd_tensor: np.ndarray, direction: int, transpose:bool = False, fliplr:bool = False, flipud:bool = False):
+    def extract_slices(ssdd_tensor: np.ndarray, direction: int, transpose: bool = False, fliplr: bool = False,
+                       flipud: bool = False):
         """
         :param ssdd_tensor: 3D SSDD tensor with shape (H, W, label_size)
         :param direction: a number between 1 and 2:
@@ -161,19 +164,19 @@ class Solution:
         # Local Variables
         # ==============================================================================================================
         height, width, labels_num = ssdd_tensor.shape
-        slices_dict    = {}
-        indices_dict   = {}
-        xx, yy         = np.meshgrid(np.arange(width), np.arange(height))
+        slices_dict = {}
+        indices_dict = {}
+        xx, yy = np.meshgrid(np.arange(width), np.arange(height))
         # ==============================================================================================================
         # Performing according to each direction
         # ==============================================================================================================
         if direction == 1:
             for ii in range(height):
-                slices_dict[ii]      = ssdd_tensor[ii,:,:]
+                slices_dict[ii] = ssdd_tensor[ii, :, :]
                 # --------------------------------------------------------------------------------------------------
                 # Dealing with transposed input
                 # --------------------------------------------------------------------------------------------------
-                if  not transpose:
+                if not transpose:
                     indices_dict[ii] = np.array(list(zip(yy[ii, :], xx[ii, :])))
                 else:
                     indices_dict[ii] = np.array(list(zip(xx[ii, :], yy[ii, :])))
@@ -194,10 +197,12 @@ class Solution:
         elif direction == 2:
             counter = 0
             for ii in range(np.max([height, width])):
-                indices_temp = np.array(list(zip(range(np.max([height, width])), range(np.max([height, width])))))[ii:,:]
-                indices_temp[:,1] -= ii
-                indices_dict[counter]   = indices_temp[indices_temp[:,0] < height, :] if height <= width else indices_temp[indices_temp[:,1] < width, :]
-                slices_dict[counter]    = ssdd_tensor[indices_dict[counter][:, 0], indices_dict[counter][:, 1], :]
+                indices_temp = np.array(list(zip(range(np.max([height, width])), range(np.max([height, width])))))[ii:,
+                               :]
+                indices_temp[:, 1] -= ii
+                indices_dict[counter] = indices_temp[indices_temp[:, 0] < height,
+                                        :] if height <= width else indices_temp[indices_temp[:, 1] < width, :]
+                slices_dict[counter] = ssdd_tensor[indices_dict[counter][:, 0], indices_dict[counter][:, 1], :]
                 # --------------------------------------------------------------------------------------------------
                 # Dealing with transposed input
                 # --------------------------------------------------------------------------------------------------
@@ -215,10 +220,12 @@ class Solution:
                     indices_dict[counter][:, 0] = height - 1 - indices_dict[counter][:, 0]
                 counter += 1
                 if ii > 0:
-                    indices_temp = np.array(list(zip(range(np.max([height, width])), range(np.max([height, width])))))[ii:,:]
+                    indices_temp = np.array(list(zip(range(np.max([height, width])), range(np.max([height, width])))))[
+                                   ii:, :]
                     indices_temp[:, 0] -= ii
-                    indices_dict[counter]   = indices_temp[indices_temp[:,0] < height, :] if height <= width else indices_temp[indices_temp[:,1] < width, :]
-                    slices_dict[counter]    = ssdd_tensor[indices_dict[counter][:, 0], indices_dict[counter][:, 1], :]
+                    indices_dict[counter] = indices_temp[indices_temp[:, 0] < height,
+                                            :] if height <= width else indices_temp[indices_temp[:, 1] < width, :]
+                    slices_dict[counter] = ssdd_tensor[indices_dict[counter][:, 0], indices_dict[counter][:, 1], :]
                     # ----------------------------------------------------------------------------------------------
                     # Dealing with transposed input
                     # ----------------------------------------------------------------------------------------------
@@ -238,7 +245,7 @@ class Solution:
 
         return slices_dict, indices_dict
 
-    def orient_direction_and_extract_slices(self,ssdd_tensor: np.ndarray, direction: int):
+    def orient_direction_and_extract_slices(self, ssdd_tensor: np.ndarray, direction: int):
         """
         :param ssdd_tensor: 3D SSDD tensor with shape (H, W, label_size)
         :param direction: a number between 1 and 8:
@@ -267,7 +274,7 @@ class Solution:
         elif direction == 2:
             return self.extract_slices(ssdd_tensor, 2)
         elif direction == 3:
-            ssdd_tensor_transformed = np.moveaxis(ssdd_tensor, [0,1,2], [1,0,2])
+            ssdd_tensor_transformed = np.moveaxis(ssdd_tensor, [0, 1, 2], [1, 0, 2])
             return self.extract_slices(ssdd_tensor_transformed, 1, transpose=True)
         elif direction == 4:
             ssdd_tensor_transformed = np.fliplr(ssdd_tensor)
@@ -279,7 +286,7 @@ class Solution:
             ssdd_tensor_transformed = np.fliplr(np.flipud(ssdd_tensor))
             return self.extract_slices(ssdd_tensor_transformed, 2, fliplr=True, flipud=True)
         elif direction == 7:
-            ssdd_tensor_transformed = np.moveaxis(np.flipud(ssdd_tensor), [0,1,2], [1,0,2])
+            ssdd_tensor_transformed = np.moveaxis(np.flipud(ssdd_tensor), [0, 1, 2], [1, 0, 2])
             return self.extract_slices(ssdd_tensor_transformed, 1, transpose=True, flipud=True)
         elif direction == 8:
             ssdd_tensor_transformed = np.flipud(ssdd_tensor)
@@ -289,7 +296,8 @@ class Solution:
                     ssdd_tensor: np.ndarray,
                     p1: float,
                     p2: float,
-                    direction:int = 1) -> np.ndarray:
+                    direction: int = 1,
+                    returnWhole: bool = False) -> np.ndarray:
         """Estimate a depth map using Dynamic Programming.
 
         (1) Call dp_grade_slice on each row slice of the ssdd tensor.
@@ -306,6 +314,7 @@ class Solution:
             p2: penalty for taking disparity value more than 2 offset.
             direction: integer depiction of the orientation of the dynamic programing. see documentation of
                        "orient_direction_and_extract_slices" API for more
+            returnWhole: return l matrix (for all disparity values) or the final labeling
         Returns:
             Dynamic Programming depth estimation matrix of shape HxW.
         """
@@ -318,13 +327,16 @@ class Solution:
         # Running the forward MLSE computation in a for loop ONLY because this is requested in the exercise
         # ==============================================================================================================
         for ii in np.arange(0, len(slices_dict), 1):
-            slice    = slices_dict[ii]
-            indices  =indices_dict[ii]
-            l[indices[:,0], indices[:,1]] = np.transpose(self.dp_grade_slice(np.squeeze(slice), p1, p2))
+            slice = slices_dict[ii]
+            indices = indices_dict[ii]
+            l[indices[:, 0], indices[:, 1]] = np.transpose(self.dp_grade_slice(np.squeeze(slice), p1, p2))
         # ==============================================================================================================
         # Labeling in the backward process of the MLSE
         # ==============================================================================================================
-        return self.naive_labeling(l)
+        if returnWhole:
+            return l
+        else:
+            return self.naive_labeling(l)
 
     def dp_labeling_per_direction(self,
                                   ssdd_tensor: np.ndarray,
@@ -358,13 +370,13 @@ class Solution:
         l = np.zeros_like(ssdd_tensor)
         direction_to_slice = {}
         for ii in range(num_of_directions):
-            direction_to_slice[ii+1] = self.dp_labeling(ssdd_tensor, p1, p2, direction=ii+1)
+            direction_to_slice[ii + 1] = self.dp_labeling(ssdd_tensor, p1, p2, direction=ii + 1)
 
         if False:
             import matplotlib.pyplot as plt
             from main import load_data
             left_image, _ = load_data()
-            fig, axes = plt.subplots(3,3, sharex=True)
+            fig, axes = plt.subplots(3, 3, sharex=True)
             axes[1, 0].imshow(direction_to_slice[1])
             axes[1, 0].set_title('Direction 1')
             axes[0, 0].imshow(direction_to_slice[2])
@@ -407,7 +419,10 @@ class Solution:
         Returns:
             Semi-Global Mapping depth estimation matrix of shape HxW.
         """
+
         num_of_directions = 8
         l = np.zeros_like(ssdd_tensor)
-        """INSERT YOUR CODE HERE"""
+        for ii in range(num_of_directions):
+            l += self.dp_labeling(ssdd_tensor, p1, p2, direction=ii + 1, returnWhole=True)
+        l /= 8
         return self.naive_labeling(l)

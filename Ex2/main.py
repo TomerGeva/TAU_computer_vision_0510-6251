@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
 from solution import Solution
-
+#import numba as nb
 COST1 = 0.5
 COST2 = 3.0
 WIN_SIZE = 3
@@ -14,6 +14,8 @@ DISPARITY_RANGE = 20
 # students' IDs:
 ID1 = '311140586'
 ID2 = '205882699'
+
+
 ##########################################################
 
 
@@ -48,7 +50,7 @@ def load_data(is_your_data=False):
 
 
 def main():
-    COST1 = 0.5 #TODO: why cannot use variables from head of file (seems not global)
+    COST1 = 0.5  # TODO: why cannot use variables from head of file (seems not global)
     COST2 = 3.0
     WIN_SIZE = 3
     DISPARITY_RANGE = 20
@@ -94,7 +96,6 @@ def main():
     plt.title('Smooth Depth - DP')
     plt.show()
 
-
     # Compute forward map of the left image to the right image.
     mapped_image_smooth_dp = forward_map(left_image, labels=label_smooth_dp)
     # plot left image, forward map image and right image
@@ -108,6 +109,7 @@ def main():
     plt.subplot(1, 3, 3)
     plt.imshow(right_image)
     plt.title('Right Image')
+    plt.show()
 
     # Generate a dictionary which maps each direction to a label map:
     tt = tic()
@@ -133,6 +135,7 @@ def main():
     tt = tic()
     label_smooth_sgm = solution.sgm_labeling(ssdd, COST1, COST2)
     print(f"SGM done in {toc(tt):.4f}[seconds]")
+    plt.show()
 
     # Plot Semi-Global Mapping result:
     plt.figure()
@@ -143,6 +146,7 @@ def main():
     plt.imshow(label_smooth_sgm)
     plt.colorbar()
     plt.title('Smooth Depth - SGM')
+    plt.show()
 
     # Plot the forward map based on the Semi-Global Mapping result:
     mapped_image_smooth_sgm = forward_map(left_image, labels=label_smooth_sgm)
@@ -156,14 +160,17 @@ def main():
     plt.subplot(1, 3, 3)
     plt.imshow(right_image)
     plt.title('Right Image')
+    plt.show()
 
     ###########################################################################
     ########################### YOUR IMAGE PLAYGROUND #########################
     ###########################################################################
-    COST1 = 0.5           # YOU MAY CHANGE THIS
-    COST2 = 3.0           # YOU MAY CHANGE THIS
-    WIN_SIZE = 3          # YOU MAY CHANGE THIS
-    DISPARITY_RANGE = 20  # YOU MAY CHANGE THIS
+def our_main():
+
+    COST1 = 0  # YOU MAY CHANGE THIS
+    COST2 = 0  # YOU MAY CHANGE THIS
+    WIN_SIZE = 4  # YOU MAY CHANGE THIS
+    DISPARITY_RANGE = 15  # YOU MAY CHANGE THIS
 
     your_left_image, your_right_image = load_data(is_your_data=True)
     solution = Solution()
@@ -177,6 +184,18 @@ def main():
 
     # plot all directions as well as the image, in the center of the plot
     tt = tic()
+    your_label_map = solution.naive_labeling(your_ssdd)
+    print(f"Naive labeling done in {toc(tt):.4f}[seconds]")
+
+    # plot the left image and the estimated depth
+    fig = plt.figure()
+    plt.subplot(1, 2, 1)
+    plt.imshow(your_left_image)
+    plt.subplot(1, 2, 2)
+    plt.imshow(your_label_map)
+    plt.colorbar()
+    plt.title('Naive Depth')
+    plt.show()
     your_direction_to_vote = solution.dp_labeling_per_direction(your_ssdd,
                                                                 COST1,
                                                                 COST2)
@@ -195,35 +214,38 @@ def main():
             plt.imshow(your_direction_to_vote[i - 1])
             plt.title(f'Direction {i - 1}')
 
-    # Smooth disparity image - Semi-Global Mapping
-    tt = tic()
-    your_label_smooth_sgm = solution.sgm_labeling(your_ssdd, COST1, COST2)
-    print(f"SGM on your image done in {toc(tt):.4f}[seconds]")
-    plt.figure()
-    plt.subplot(1, 2, 1)
-    plt.imshow(your_left_image)
-    plt.title('Your Source Image')
-    plt.subplot(1, 2, 2)
-    plt.imshow(your_label_smooth_sgm)
-    plt.colorbar()
-    plt.title('Your Smooth Depth - SGM')
-
-    # Plot the forward map based on the Semi-Global Mapping result:
-    your_mapped_image_smooth_sgm = forward_map(your_left_image,
-                                               labels=your_label_smooth_sgm)
-    plt.figure()
-    plt.subplot(1, 3, 1)
-    plt.imshow(your_left_image)
-    plt.title('Your Source Image')
-    plt.subplot(1, 3, 2)
-    plt.imshow(your_mapped_image_smooth_sgm)
-    plt.title('Your Smooth Forward map - SGM')
-    plt.subplot(1, 3, 3)
-    plt.imshow(your_right_image)
-    plt.title('Your Right Image')
-
     plt.show()
 
 
+    # Smooth disparity image - Semi-Global Mapping
+    tt = tic()
+    # your_label_smooth_sgm = solution.sgm_labeling(your_ssdd, COST1, COST2)
+    # print(f"SGM on your image done in {toc(tt):.4f}[seconds]")
+    # plt.figure()
+    # plt.subplot(1, 2, 1)
+    # plt.imshow(your_left_image)
+    # plt.title('Your Source Image')
+    # plt.subplot(1, 2, 2)
+    # plt.imshow(your_label_smooth_sgm)
+    # plt.colorbar()
+    # plt.title('Your Smooth Depth - SGM')
+    # plt.show()
+
+    # # Plot the forward map based on the Semi-Global Mapping result:
+    # your_mapped_image_smooth_sgm = forward_map(your_left_image,
+    #                                            labels=your_label_smooth_sgm)
+    # plt.figure()
+    # plt.subplot(1, 3, 1)
+    # plt.imshow(your_left_image)
+    # plt.title('Your Source Image')
+    # plt.subplot(1, 3, 2)
+    # plt.imshow(your_mapped_image_smooth_sgm)
+    # plt.title('Your Smooth Forward map - SGM')
+    # plt.subplot(1, 3, 3)
+    # plt.imshow(your_right_image)
+    # plt.title('Your Right Image')
+    # plt.show()
+
+
 if __name__ == "__main__":
-    main()
+    our_main()
