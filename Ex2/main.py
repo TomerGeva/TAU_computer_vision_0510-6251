@@ -167,8 +167,8 @@ def main():
     ###########################################################################
 def our_main():
 
-    COST1 = 0  # YOU MAY CHANGE THIS
-    COST2 = 0  # YOU MAY CHANGE THIS
+    COST1 = 0.5  # YOU MAY CHANGE THIS
+    COST2 = 3  # YOU MAY CHANGE THIS
     WIN_SIZE = 4  # YOU MAY CHANGE THIS
     DISPARITY_RANGE = 15  # YOU MAY CHANGE THIS
 
@@ -219,32 +219,32 @@ def our_main():
 
     # Smooth disparity image - Semi-Global Mapping
     tt = tic()
-    # your_label_smooth_sgm = solution.sgm_labeling(your_ssdd, COST1, COST2)
-    # print(f"SGM on your image done in {toc(tt):.4f}[seconds]")
-    # plt.figure()
-    # plt.subplot(1, 2, 1)
-    # plt.imshow(your_left_image)
-    # plt.title('Your Source Image')
-    # plt.subplot(1, 2, 2)
-    # plt.imshow(your_label_smooth_sgm)
-    # plt.colorbar()
-    # plt.title('Your Smooth Depth - SGM')
-    # plt.show()
+    your_label_smooth_sgm = solution.sgm_labeling(your_ssdd, COST1, COST2)
+    print(f"SGM on your image done in {toc(tt):.4f}[seconds]")
+    plt.figure()
+    plt.subplot(1, 2, 1)
+    plt.imshow(your_left_image)
+    plt.title('Your Source Image')
+    plt.subplot(1, 2, 2)
+    plt.imshow(your_label_smooth_sgm)
+    plt.colorbar()
+    plt.title('Your Smooth Depth - SGM')
+    plt.show()
 
-    # # Plot the forward map based on the Semi-Global Mapping result:
-    # your_mapped_image_smooth_sgm = forward_map(your_left_image,
-    #                                            labels=your_label_smooth_sgm)
-    # plt.figure()
-    # plt.subplot(1, 3, 1)
-    # plt.imshow(your_left_image)
-    # plt.title('Your Source Image')
-    # plt.subplot(1, 3, 2)
-    # plt.imshow(your_mapped_image_smooth_sgm)
-    # plt.title('Your Smooth Forward map - SGM')
-    # plt.subplot(1, 3, 3)
-    # plt.imshow(your_right_image)
-    # plt.title('Your Right Image')
-    # plt.show()
+    # Plot the forward map based on the Semi-Global Mapping result:
+    your_mapped_image_smooth_sgm = forward_map(your_left_image,
+                                               labels=your_label_smooth_sgm)
+    plt.figure()
+    plt.subplot(1, 3, 1)
+    plt.imshow(your_left_image)
+    plt.title('Your Source Image')
+    plt.subplot(1, 3, 2)
+    plt.imshow(your_mapped_image_smooth_sgm)
+    plt.title('Your Smooth Forward map - SGM')
+    plt.subplot(1, 3, 3)
+    plt.imshow(your_right_image)
+    plt.title('Your Right Image')
+    plt.show()
 
 
 if __name__ == "__main__":
