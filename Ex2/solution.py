@@ -53,15 +53,11 @@ class Solution:
             # ------------------------------------------------------------------------------------------------------
             # Preparing the images for the convolution
             # ------------------------------------------------------------------------------------------------------
-            # right_image_roll    = np.roll(right_image, disparity, axis=1)
-            # images_diff_squared = np.power(left_image - right_image_roll, 2)
-            images_diff_squared = np.power(left_image - right_image_pad[:, ii:ii + right_image.shape[1]], 2)
+            images_diff_squared = np.sum(np.power(left_image - right_image_pad[:, ii:ii + right_image.shape[1]], 2), axis=2)
             # ------------------------------------------------------------------------------------------------------
             # Performing the convolution one dimension at a time since we can not use pytorch :/
             # ------------------------------------------------------------------------------------------------------
-            for jj in range(left_image.shape[2]):
-                channel = images_diff_squared[:, :, jj]
-                ssdd_tensor[:, :, ii] += convolve2d(channel, kernel, mode='same')
+            ssdd_tensor[:, :, ii] += convolve2d(images_diff_squared, kernel, mode='same')
         # ==============================================================================================================
         # Normalizing to range
         # ==============================================================================================================
