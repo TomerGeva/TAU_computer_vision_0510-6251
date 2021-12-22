@@ -167,10 +167,10 @@ def main():
     ###########################################################################
 def our_main():
 
-    COST1 = 0.5  # YOU MAY CHANGE THIS
-    COST2 = 3  # YOU MAY CHANGE THIS
-    WIN_SIZE = 4  # YOU MAY CHANGE THIS
-    DISPARITY_RANGE = 15  # YOU MAY CHANGE THIS
+    COST1 = 0.1  # YOU MAY CHANGE THIS
+    COST2 = 1.5  # YOU MAY CHANGE THIS
+    WIN_SIZE = 11  # YOU MAY CHANGE THIS
+    DISPARITY_RANGE = 12  # YOU MAY CHANGE THIS
 
     your_left_image, your_right_image = load_data(is_your_data=True)
     solution = Solution()
@@ -248,4 +248,5 @@ def our_main():
 
 
 if __name__ == "__main__":
+    main()
     our_main()

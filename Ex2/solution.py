@@ -173,13 +173,7 @@ class Solution:
         if direction == 1:
             for ii in range(height):
                 slices_dict[ii] = ssdd_tensor[ii, :, :]
-                # --------------------------------------------------------------------------------------------------
-                # Dealing with transposed input
-                # --------------------------------------------------------------------------------------------------
-                if not transpose:
-                    indices_dict[ii] = np.array(list(zip(yy[ii, :], xx[ii, :])))
-                else:
-                    indices_dict[ii] = np.array(list(zip(xx[ii, :], yy[ii, :])))
+                indices_dict[ii] = np.array(list(zip(yy[ii, :], xx[ii, :])))
                 # --------------------------------------------------------------------------------------------------
                 # Dealing with flipped input left -> right
                 # --------------------------------------------------------------------------------------------------
@@ -189,10 +183,12 @@ class Solution:
                 # Dealing with flipped input top -> bottom
                 # --------------------------------------------------------------------------------------------------
                 if flipud:
-                    if not transpose:
-                        indices_dict[ii][:, 0] = height - 1 - indices_dict[ii][:, 0]
-                    else:
-                        indices_dict[ii][:, 0] = width - 1 - indices_dict[ii][:, 0]
+                    indices_dict[ii][:, 0] = height - 1 - indices_dict[ii][:, 0]
+                # --------------------------------------------------------------------------------------------------
+                # Dealing with transposed input
+                # --------------------------------------------------------------------------------------------------
+                if transpose:
+                    indices_dict[ii] = np.fliplr(indices_dict[ii])
 
         elif direction == 2:
             counter = 0
@@ -200,14 +196,8 @@ class Solution:
                 indices_temp = np.array(list(zip(range(np.max([height, width])), range(np.max([height, width])))))[ii:,
                                :]
                 indices_temp[:, 1] -= ii
-                indices_dict[counter] = indices_temp[indices_temp[:, 0] < height,
-                                        :] if height <= width else indices_temp[indices_temp[:, 1] < width, :]
+                indices_dict[counter] = indices_temp[indices_temp[:, 0] < height, :] if height <= width else indices_temp[indices_temp[:, 1] < width, :]
                 slices_dict[counter] = ssdd_tensor[indices_dict[counter][:, 0], indices_dict[counter][:, 1], :]
-                # --------------------------------------------------------------------------------------------------
-                # Dealing with transposed input
-                # --------------------------------------------------------------------------------------------------
-                if transpose:
-                    indices_dict[counter] = np.fliplr(indices_dict[counter])
                 # --------------------------------------------------------------------------------------------------
                 # Dealing with flipped input left -> right
                 # --------------------------------------------------------------------------------------------------
@@ -218,6 +208,11 @@ class Solution:
                 # --------------------------------------------------------------------------------------------------
                 if flipud:
                     indices_dict[counter][:, 0] = height - 1 - indices_dict[counter][:, 0]
+                # --------------------------------------------------------------------------------------------------
+                # Dealing with transposed input
+                # --------------------------------------------------------------------------------------------------
+                if transpose:
+                    indices_dict[counter] = np.fliplr(indices_dict[counter])
                 counter += 1
                 if ii > 0:
                     indices_temp = np.array(list(zip(range(np.max([height, width])), range(np.max([height, width])))))[
@@ -226,21 +221,21 @@ class Solution:
                     indices_dict[counter] = indices_temp[indices_temp[:, 0] < height,
                                             :] if height <= width else indices_temp[indices_temp[:, 1] < width, :]
                     slices_dict[counter] = ssdd_tensor[indices_dict[counter][:, 0], indices_dict[counter][:, 1], :]
-                    # ----------------------------------------------------------------------------------------------
-                    # Dealing with transposed input
-                    # ----------------------------------------------------------------------------------------------
-                    if transpose:
-                        indices_dict[counter] = np.fliplr(indices_dict[counter])
-                    # ----------------------------------------------------------------------------------------------
+                    # --------------------------------------------------------------------------------------------------
                     # Dealing with flipped input left -> right
-                    # ----------------------------------------------------------------------------------------------
+                    # --------------------------------------------------------------------------------------------------
                     if fliplr:
                         indices_dict[counter][:, 1] = width - 1 - indices_dict[counter][:, 1]
-                    # ----------------------------------------------------------------------------------------------
+                    # --------------------------------------------------------------------------------------------------
                     # Dealing with flipped input top -> bottom
-                    # ----------------------------------------------------------------------------------------------
+                    # --------------------------------------------------------------------------------------------------
                     if flipud:
                         indices_dict[counter][:, 0] = height - 1 - indices_dict[counter][:, 0]
+                    # --------------------------------------------------------------------------------------------------
+                    # Dealing with transposed input
+                    # --------------------------------------------------------------------------------------------------
+                    if transpose:
+                        indices_dict[counter] = np.fliplr(indices_dict[counter])
                     counter += 1
 
         return slices_dict, indices_dict
@@ -287,7 +282,7 @@ class Solution:
             return self.extract_slices(ssdd_tensor_transformed, 2, fliplr=True, flipud=True)
         elif direction == 7:
             ssdd_tensor_transformed = np.moveaxis(np.flipud(ssdd_tensor), [0, 1, 2], [1, 0, 2])
-            return self.extract_slices(ssdd_tensor_transformed, 1, transpose=True, flipud=True)
+            return self.extract_slices(ssdd_tensor_transformed, 1, transpose=True, fliplr=True)
         elif direction == 8:
             ssdd_tensor_transformed = np.flipud(ssdd_tensor)
             return self.extract_slices(ssdd_tensor_transformed, 2, flipud=True)
