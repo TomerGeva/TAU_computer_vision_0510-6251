@@ -146,7 +146,10 @@ class Solution:
         return l_slice
 
     @staticmethod
-    def extract_slices(ssdd_tensor: np.ndarray, direction: int, transpose: bool = False, fliplr: bool = False,
+    def extract_slices(ssdd_tensor: np.ndarray,
+                       direction: int,
+                       transpose: bool = False,
+                       fliplr: bool = False,
                        flipud: bool = False):
         """
         :param ssdd_tensor: 3D SSDD tensor with shape (H, W, label_size)
