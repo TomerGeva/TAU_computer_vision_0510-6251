@@ -57,7 +57,7 @@ class Solution:
             # ------------------------------------------------------------------------------------------------------
             # Performing the convolution one dimension at a time since we can not use pytorch :/
             # ------------------------------------------------------------------------------------------------------
-            ssdd_tensor[:, :, ii] += convolve2d(images_diff_squared, kernel, mode='same')
+            ssdd_tensor[:, :, ii] = convolve2d(images_diff_squared, kernel, mode='same')
         # ==============================================================================================================
         # Normalizing to range
         # ==============================================================================================================
@@ -420,3 +420,161 @@ class Solution:
             l += self.dp_labeling(ssdd_tensor, p1, p2, direction=ii + 1, returnWhole=True)
         l /= 8
         return self.naive_labeling(l)
+
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    # Bonus functions
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    @staticmethod
+    def get_gradient_map(image: np.ndarray) -> np.ndarray:
+            # ==============================================================================================================
+            # Local Variables
+            # ==============================================================================================================
+            kernel_sobel_horiz = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+            kernel_sobel_verti = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]])
+            kernel_laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+            grad_map_horiz = np.zeros((image.shape[0], image.shape[1], 1))
+            grad_map_verti = np.zeros((image.shape[0], image.shape[1], 1))
+            laplacian_map = np.zeros((image.shape[0], image.shape[1], 1))
+            for ii in range(image.shape[2]):
+                grad_map_horiz[:, :, 0] += np.power(convolve2d(image[:, :, ii], kernel_sobel_horiz, mode='same'), 2)
+                grad_map_verti[:, :, 0] += np.power(convolve2d(image[:, :, ii], kernel_sobel_verti, mode='same'), 2)
+                laplacian_map[:, :, 0] += np.power(convolve2d(image[:, :, ii], kernel_laplacian, mode='same'), 2)
+
+            return np.stack((grad_map_horiz, grad_map_verti, laplacian_map), axis=2)
+
+    @staticmethod
+    def dp_labeling_custom(ssdd_tensor: np.ndarray,
+                           p1: float,
+                           p2: float) -> np.ndarray:
+        """Estimate a depth map using Dynamic Programming.
+
+        (1) Call dp_grade_slice on each row slice of the ssdd tensor.
+        (2) Store each slice in a corresponding l tensor (of shape as ssdd).
+        (3) Finally, for each pixel in l (along each row and column), choose
+        the best disparity value. That is the disparity value which
+        corresponds to the lowest l value in that pixel.
+
+        Args:
+            ssdd_tensor: A tensor of the sum of squared differences for every
+            pixel in a window of size win_size X win_size, for the
+            2*dsp_range + 1 possible disparity values.
+            p1: penalty for taking disparity value with 1 offset.
+            p2: penalty for taking disparity value more than 2 offset.
+        Returns:
+            Dynamic Programming depth estimation matrix of shape HxW.
+        """
+        # ==============================================================================================================
+        # Local Variables
+        # ==============================================================================================================
+        num_of_rows, num_of_cols, num_labels = ssdd_tensor.shape
+        l         = np.zeros_like(ssdd_tensor)
+        index_mat = np.zeros_like(ssdd_tensor).astype(np.int)
+        yy, xx    = np.meshgrid(np.arange(num_labels), np.arange(num_labels))
+        depth_map = np.zeros((num_of_rows, num_of_cols))
+        # ==============================================================================================================
+        # Running the forward MLSE computation in a for loop ONLY because this is requested in the exercise
+        # ==============================================================================================================
+        for row in np.arange(0, ssdd_tensor.shape[0], 1):
+            if row == 0:
+                l[row,:,:]          = ssdd_tensor[row,:,:]
+            else:
+                # --------------------------------------------------------------------------------------------------
+                # Extracting the state matrix
+                # --------------------------------------------------------------------------------------------------
+                state_matrix = np.moveaxis(np.tile(l[row - 1, :, :], [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
+                # --------------------------------------------------------------------------------------------------
+                # Computing the transition matrix
+                # --------------------------------------------------------------------------------------------------
+                # **********************************************************************************************
+                # Filling initial values without penalties
+                # **********************************************************************************************
+                transition_matrix   = np.moveaxis(np.tile(np.squeeze(ssdd_tensor[row-1,:,:]), [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
+                # **********************************************************************************************
+                # Adding P1 for deviation from the main diagonal by +-1
+                # **********************************************************************************************
+                transition_matrix[:,np.abs(yy - xx) == 1] += p1
+                # **********************************************************************************************
+                # Adding P2 for deviation from the main diagonal by +-2 or more
+                # **********************************************************************************************
+                transition_matrix[:,np.abs(yy - xx) >= 2] += p2
+                # --------------------------------------------------------------------------------------------------
+                # Inserting the minimum value matching each label in the MLSE matrix
+                # --------------------------------------------------------------------------------------------------
+                l[row,:,:] = np.min(state_matrix + transition_matrix, axis=2)
+                # --------------------------------------------------------------------------------------------------
+                # Getting best path index
+                # --------------------------------------------------------------------------------------------------
+                index_mat[row-1, :] = np.argmin(state_matrix + transition_matrix, axis=2)
+        # ==============================================================================================================
+        # Finished forward pass, filling depth map in the backward pass
+        # ==============================================================================================================
+        col_vec = np.arange(num_of_cols)
+        index_vec = np.argmin(l[-1,:,:], axis=1)
+        for row in np.arange(ssdd_tensor.shape[0]-1, 0, -1):
+            depth_map[row,:] = index_vec
+            index_vec = index_mat[row-1,col_vec,index_vec]
+
+        return depth_map.astype(np.int)
+
+    def orient_direction_and_label_custom(self, ssdd_tensor: np.ndarray,
+                                          direction: int,
+                                          p1: float,
+                                          p2: float) ->np.ndarray:
+        """
+            :param ssdd_tensor: 3D SSDD tensor with shape (H, W, label_size)
+            :param direction: a number between 1 and 4:
+                                1. top       -> bottom
+                                2. left      -> right
+                                3. bottom    -> top
+                                4. right     -> left
+            :param p1: penalty for diff of 1
+            :param p2: penalty of more than 2
+            :return: The function orents the ssdd tensor such that the slices will be taken from left to right or across the
+                     main diagonal. this means:
+                         1. nothing
+                         2. transpose
+                         3. flip top  -> bottom
+                         4. flip left -> right + transpose
+                     After performing the needed orientation change, the function calls the dp_labeling_custom method
+        """
+        if direction == 1:
+            return self.dp_labeling_custom(ssdd_tensor, p1, p2)
+        elif direction == 2:
+            ssdd_tensor_transformed = np.moveaxis(ssdd_tensor, [0, 1, 2], [1, 0, 2])
+            return np.transpose(self.dp_labeling_custom(ssdd_tensor_transformed, p1, p2))
+        elif direction == 3:
+            ssdd_tensor_transformed = np.flipud(ssdd_tensor)
+            return np.flipud(self.dp_labeling_custom(ssdd_tensor_transformed, p1, p2))
+        elif direction == 4:
+            ssdd_tensor_transformed = np.moveaxis(np.fliplr(ssdd_tensor), [0, 1, 2], [1, 0, 2])
+            return np.transpose(np.flipud(self.dp_labeling_custom(ssdd_tensor_transformed, p1, p2)))
+
+    def sgm_labeling_custom(self, ssdd_tensor: np.ndarray, p1: float, p2: float):
+        """Estimate the depth map according to the SGM algorithm.
+
+        For each direction in 1, ..., 8, calculate scores tensors
+        according to dp_grade_slice and the method which allows you to
+        extract slices along each direction.
+
+        You may use helper methods (functions) that you write on your own.
+        We found `np.diagonal` to be very helpful to extract diagonal slices.
+        `np.unravel_index` might be helpful if you're thinking in MATLAB
+        notations: it's the ind2sub equivalent.
+
+        Args:
+            ssdd_tensor: A tensor of the sum of squared differences for
+            every pixel in a window of size win_size X win_size, for the
+            2*dsp_range + 1 possible disparity values.
+            p1: penalty for taking disparity value with 1 offset.
+            p2: penalty for taking disparity value more than 2 offset.
+
+        Returns:
+            Semi-Global Mapping depth estimation matrix of shape HxW.
+        """
+
+        num_of_directions = 4
+        depth_map = np.zeros((ssdd_tensor.shape[0], ssdd_tensor.shape[1])).astype(np.int)
+        for ii in range(num_of_directions):
+            depth_map += self.orient_direction_and_label_custom(ssdd_tensor, direction=ii + 1, p1=p1, p2=p2)
+        return np.round(depth_map / num_of_directions).astype(np.int)
+

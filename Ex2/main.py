@@ -165,6 +165,7 @@ def main():
     ###########################################################################
     ########################### YOUR IMAGE PLAYGROUND #########################
     ###########################################################################
+
 def our_main():
 
     COST1 = 0.1  # YOU MAY CHANGE THIS
@@ -246,7 +247,66 @@ def our_main():
     plt.title('Your Right Image')
     plt.show()
 
+def dummy_main():
+    COST1 = 0.5    # YOU MAY CHANGE THIS
+    COST2 = 6      # YOU MAY CHANGE THIS
+    WIN_SIZE = 7  # YOU MAY CHANGE THIS
+    DISPARITY_RANGE = 20  # YOU MAY CHANGE THIS
+
+    your_left_image, your_right_image = load_data(is_your_data=True)
+    solution = Solution()
+    # Compute Sum-Square-Diff distance
+    tt = tic()
+    your_ssdd = solution.ssd_distance(your_left_image.astype(np.float64),
+                                      your_right_image.astype(np.float64),
+                                      win_size=WIN_SIZE,
+                                      dsp_range=DISPARITY_RANGE)
+    print(f"SSDD calculation on your image took: {toc(tt):.4f}[seconds]")
+
+    # plot all directions as well as the image, in the center of the plot
+    tt = tic()
+    your_label_map = solution.naive_labeling(your_ssdd)
+    print(f"Naive labeling done in {toc(tt):.4f}[seconds]")
+
+    # plot the left image and the estimated depth
+    fig = plt.figure()
+    plt.subplot(1, 2, 1)
+    plt.imshow(your_left_image)
+    plt.subplot(1, 2, 2)
+    plt.imshow(your_label_map)
+    plt.colorbar()
+    plt.title('Naive Depth')
+    plt.show()
+
+    tt = tic()
+    your_label_smooth_sgm = solution.sgm_labeling_custom(your_ssdd,
+                                                         COST1,
+                                                         COST2)
+
+    print(f"Dynamic programming took: {toc(tt):.4f}[seconds]")
+    plt.figure()
+    plt.imshow(your_label_smooth_sgm)
+    plt.title("Depth Map Using Back-propagation Dynamic Programming")
+    plt.colorbar()
+    plt.show()
+
+    # Plot the forward map based on the Semi-Global Mapping result:
+    your_mapped_image_smooth_sgm = forward_map(your_left_image,
+                                               labels=your_label_smooth_sgm)
+    plt.figure()
+    plt.subplot(1, 3, 1)
+    plt.imshow(your_left_image)
+    plt.title('Your Source Image')
+    plt.subplot(1, 3, 2)
+    plt.imshow(your_mapped_image_smooth_sgm)
+    plt.title('Your Smooth Forward map - SGM')
+    plt.subplot(1, 3, 3)
+    plt.imshow(your_right_image)
+    plt.title('Your Right Image')
+    plt.show()
+
 
 if __name__ == "__main__":
-    main()
-    our_main()
+    # main()
+    # our_main()
+    dummy_main()
