@@ -1,6 +1,6 @@
 """Stereo matching."""
 import numpy as np
-from scipy.signal import convolve2d
+from scipy.signal import convolve2d, medfilt2d
 
 global WIN_SIZE
 
@@ -13,7 +13,8 @@ class Solution:
     def ssd_distance(left_image: np.ndarray,
                      right_image: np.ndarray,
                      win_size: int,
-                     dsp_range: int) -> np.ndarray:
+                     dsp_range: int,
+                     get_median: bool = False) -> np.ndarray:
         """Compute the SSDD distances tensor.
 
         Args:
@@ -57,8 +58,11 @@ class Solution:
             # ------------------------------------------------------------------------------------------------------
             # Performing the convolution one dimension at a time since we can not use pytorch :/
             # ------------------------------------------------------------------------------------------------------
-            ssdd_tensor[:, :, ii] = convolve2d(images_diff_squared, kernel, mode='same')
-        # ==============================================================================================================
+            if not get_median:
+                ssdd_tensor[:, :, ii] = convolve2d(images_diff_squared, kernel, mode='same')
+            else:
+                ssdd_tensor[:, :, ii] = medfilt2d(images_diff_squared, kernel_size=win_size)
+                # ==============================================================================================================
         # Normalizing to range
         # ==============================================================================================================
         ssdd_tensor -= ssdd_tensor.min()
@@ -472,11 +476,11 @@ class Solution:
         yy, xx    = np.meshgrid(np.arange(num_labels), np.arange(num_labels))
         depth_map = np.zeros((num_of_rows, num_of_cols))
         # ==============================================================================================================
-        # Running the forward MLSE computation in a for loop ONLY because this is requested in the exercise
+        # Running the forward MLSE computation
         # ==============================================================================================================
         for row in np.arange(0, ssdd_tensor.shape[0], 1):
             if row == 0:
-                l[row,:,:]          = ssdd_tensor[row,:,:]
+                l[row,:,:] = ssdd_tensor[row,:,:]
             else:
                 # --------------------------------------------------------------------------------------------------
                 # Extracting the state matrix
