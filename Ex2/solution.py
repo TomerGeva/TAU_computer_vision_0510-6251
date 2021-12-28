@@ -128,7 +128,7 @@ class Solution:
                 # **********************************************************************************************
                 # Filling initial values without penalties
                 # **********************************************************************************************
-                transition_matrix = np.tile(l_slice[:, col - 1], [num_labels, 1])
+                transition_matrix = np.tile(l_slice[:, col-1], [num_labels, 1])
                 # **********************************************************************************************
                 # Adding P1 for deviation from the main diagonal by +-1
                 # **********************************************************************************************
@@ -449,7 +449,8 @@ class Solution:
     @staticmethod
     def dp_labeling_custom(ssdd_tensor: np.ndarray,
                            p1: float,
-                           p2: float) -> np.ndarray:
+                           p2: float,
+                           diagonals: bool = False) -> np.ndarray:
         """Estimate a depth map using Dynamic Programming.
 
         (1) Call dp_grade_slice on each row slice of the ssdd tensor.
@@ -464,6 +465,7 @@ class Solution:
             2*dsp_range + 1 possible disparity values.
             p1: penalty for taking disparity value with 1 offset.
             p2: penalty for taking disparity value more than 2 offset.
+            diagonals: stating weather to compute diagonals or not
         Returns:
             Dynamic Programming depth estimation matrix of shape HxW.
         """
@@ -471,54 +473,106 @@ class Solution:
         # Local Variables
         # ==============================================================================================================
         num_of_rows, num_of_cols, num_labels = ssdd_tensor.shape
-        l         = np.zeros_like(ssdd_tensor)
-        index_mat = np.zeros_like(ssdd_tensor).astype(np.int)
-        yy, xx    = np.meshgrid(np.arange(num_labels), np.arange(num_labels))
-        depth_map = np.zeros((num_of_rows, num_of_cols))
+        l               = np.zeros_like(ssdd_tensor)
+        index_mat       = np.zeros_like(ssdd_tensor).astype(np.int)
+        yy, xx          = np.meshgrid(np.arange(num_labels), np.arange(num_labels))
+        depth_map       = np.zeros((num_of_rows, num_of_cols))
+
+        left_indexing  = list(range(1,num_of_cols)) + [0]
+        right_indexing = [num_of_cols-1] + list(range(0, num_of_cols-1))
+        l_left = np.zeros_like(ssdd_tensor)
+        l_right = np.zeros_like(ssdd_tensor)
+        index_mat_left  = np.zeros_like(ssdd_tensor).astype(np.int)
+        index_mat_right = np.zeros_like(ssdd_tensor).astype(np.int)
+        depth_map_left  = np.zeros((num_of_rows, num_of_cols))
+        depth_map_right = np.zeros((num_of_rows, num_of_cols))
         # ==============================================================================================================
         # Running the forward MLSE computation
         # ==============================================================================================================
         for row in np.arange(0, ssdd_tensor.shape[0], 1):
             if row == 0:
-                l[row,:,:] = ssdd_tensor[row,:,:]
+                l[row,:,:]         = ssdd_tensor[row,:,:]
+                l_left[row, :, :]  = ssdd_tensor[row, :, :]
+                l_right[row, :, :] = ssdd_tensor[row, :, :]
             else:
                 # --------------------------------------------------------------------------------------------------
                 # Extracting the state matrix
                 # --------------------------------------------------------------------------------------------------
-                state_matrix = np.moveaxis(np.tile(l[row - 1, :, :], [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
+                state_matrix       = np.moveaxis(np.tile(ssdd_tensor[row, :, :], [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
+                if diagonals:
+                    state_matrix_left  = np.moveaxis(np.tile(ssdd_tensor[row, :, :], [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
+                    state_matrix_right = np.moveaxis(np.tile(ssdd_tensor[row, :, :], [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
                 # --------------------------------------------------------------------------------------------------
                 # Computing the transition matrix
                 # --------------------------------------------------------------------------------------------------
                 # **********************************************************************************************
                 # Filling initial values without penalties
                 # **********************************************************************************************
-                transition_matrix   = np.moveaxis(np.tile(np.squeeze(ssdd_tensor[row-1,:,:]), [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
+                transition_matrix       = np.moveaxis(np.tile(l[row-1, :, :], [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
+                if diagonals:
+                    transition_matrix_left  = np.moveaxis(np.tile(l_left[row-1, left_indexing, :], [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
+                    transition_matrix_right = np.moveaxis(np.tile(l_right[row-1, right_indexing, :], [num_labels, 1, 1]), [0, 1, 2], [1, 0, 2])
                 # **********************************************************************************************
                 # Adding P1 for deviation from the main diagonal by +-1
                 # **********************************************************************************************
-                transition_matrix[:,np.abs(yy - xx) == 1] += p1
+                transition_matrix[:,np.abs(yy - xx) == 1]       += p1
+                if diagonals:
+                    transition_matrix_left[:,np.abs(yy - xx) == 1]  += p1
+                    transition_matrix_right[:,np.abs(yy - xx) == 1] += p1
                 # **********************************************************************************************
                 # Adding P2 for deviation from the main diagonal by +-2 or more
                 # **********************************************************************************************
-                transition_matrix[:,np.abs(yy - xx) >= 2] += p2
+                transition_matrix[:,np.abs(yy - xx) >= 2]       += p2
+                if diagonals:
+                    transition_matrix_left[:,np.abs(yy - xx) >= 2]  += p2
+                    transition_matrix_right[:,np.abs(yy - xx) >= 2] += p2
+                # **********************************************************************************************
+                # Summing
+                # **********************************************************************************************
+                tot_loss            = state_matrix + transition_matrix
+                if diagonals:
+                    tot_loss_left   = state_matrix_left + transition_matrix_left
+                    tot_loss_right  = state_matrix_right + transition_matrix_right
                 # --------------------------------------------------------------------------------------------------
                 # Inserting the minimum value matching each label in the MLSE matrix
                 # --------------------------------------------------------------------------------------------------
-                l[row,:,:] = np.min(state_matrix + transition_matrix, axis=2)
+                l[row,:,:]= np.min(tot_loss, axis=2)
+                # l[row,:,:]       = np.min(np.stack((np.min(tot_loss, axis=2),np.min(tot_loss_left, axis=2),np.min(tot_loss_right, axis=2)), axis=2), axis=2)
+                if diagonals:
+                    l_left[row,:,:]  = np.min(tot_loss_left, axis=2)
+                    l_right[row,:,:] = np.min(tot_loss_right, axis=2)
                 # --------------------------------------------------------------------------------------------------
                 # Getting best path index
                 # --------------------------------------------------------------------------------------------------
-                index_mat[row-1, :] = np.argmin(state_matrix + transition_matrix, axis=2)
+                index_mat[row-1, :]       = np.argmin(tot_loss, axis=2)
+                if diagonals:
+                    index_mat_left[row-1, :]  = np.argmin(tot_loss_left, axis=2)
+                    index_mat_right[row-1, :] = np.argmin(tot_loss_right, axis=2)
         # ==============================================================================================================
         # Finished forward pass, filling depth map in the backward pass
         # ==============================================================================================================
         col_vec = np.arange(num_of_cols)
-        index_vec = np.argmin(l[-1,:,:], axis=1)
-        for row in np.arange(ssdd_tensor.shape[0]-1, 0, -1):
-            depth_map[row,:] = index_vec
-            index_vec = index_mat[row-1,col_vec,index_vec]
+        index_vec       = np.argmin(l[-1,:,:], axis=1)
+        if diagonals:
+            index_vec_left  = np.argmin(l_left[-1,:,:], axis=1)
+            index_vec_right = np.argmin(l_right[-1,:,:], axis=1)
 
-        return depth_map.astype(np.int)
+        for row in np.arange(ssdd_tensor.shape[0]-1, 0, -1):
+            depth_map[row,:]        = index_vec
+            if diagonals:
+                depth_map_left[row,:]   = index_vec_left
+                depth_map_right[row,:]  = index_vec_right
+
+            index_vec       = index_mat[row-1,col_vec,index_vec]
+            if diagonals:
+                index_vec_left  = index_mat_left[row-1,col_vec,index_vec_left]
+                index_vec_right = index_mat_right[row-1,col_vec,index_vec_right]
+
+        # return np.mean(np.stack((depth_map_left, depth_map, depth_map_right), axis=0), axis=0)
+        if diagonals:
+            return np.sum(np.stack((depth_map_left, depth_map, depth_map_right), axis=0), axis=0)
+        else:
+            return depth_map
 
     def orient_direction_and_label_custom(self, ssdd_tensor: np.ndarray,
                                           direction: int,
@@ -542,13 +596,13 @@ class Solution:
                      After performing the needed orientation change, the function calls the dp_labeling_custom method
         """
         if direction == 1:
-            return self.dp_labeling_custom(ssdd_tensor, p1, p2)
+            return self.dp_labeling_custom(ssdd_tensor, p1, p2, diagonals=True)
         elif direction == 2:
             ssdd_tensor_transformed = np.moveaxis(ssdd_tensor, [0, 1, 2], [1, 0, 2])
             return np.transpose(self.dp_labeling_custom(ssdd_tensor_transformed, p1, p2))
         elif direction == 3:
             ssdd_tensor_transformed = np.flipud(ssdd_tensor)
-            return np.flipud(self.dp_labeling_custom(ssdd_tensor_transformed, p1, p2))
+            return np.flipud(self.dp_labeling_custom(ssdd_tensor_transformed, p1, p2, diagonals=True))
         elif direction == 4:
             ssdd_tensor_transformed = np.moveaxis(np.fliplr(ssdd_tensor), [0, 1, 2], [1, 0, 2])
             return np.transpose(np.flipud(self.dp_labeling_custom(ssdd_tensor_transformed, p1, p2)))
@@ -575,10 +629,10 @@ class Solution:
         Returns:
             Semi-Global Mapping depth estimation matrix of shape HxW.
         """
-
-        num_of_directions = 4
-        depth_map = np.zeros((ssdd_tensor.shape[0], ssdd_tensor.shape[1])).astype(np.int)
+        kernel_size         = 7
+        num_of_directions   = 4
+        depth_map = np.zeros((ssdd_tensor.shape[0], ssdd_tensor.shape[1]))
         for ii in range(num_of_directions):
             depth_map += self.orient_direction_and_label_custom(ssdd_tensor, direction=ii + 1, p1=p1, p2=p2)
-        return np.round(depth_map / num_of_directions).astype(np.int)
+        return medfilt2d(np.round(depth_map / (2*num_of_directions)), kernel_size=kernel_size).astype(np.int)
 
