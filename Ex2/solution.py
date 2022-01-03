@@ -372,7 +372,7 @@ class Solution:
 
         if False:
             import matplotlib.pyplot as plt
-            from main import load_data
+            from main_ours import load_data
             left_image, _ = load_data()
             fig, axes = plt.subplots(3, 3, sharex=True)
             axes[1, 0].imshow(direction_to_slice[1])
