@@ -53,14 +53,56 @@ class Trainer:
         accuracy = 0
         nof_samples = 0
         correct_labeled_samples = 0
-
+        # ==============================================================================================================
+        # Loading the dataloader
+        # ==============================================================================================================
         train_dataloader = DataLoader(self.train_dataset,
                                       self.batch_size,
                                       shuffle=True)
         print_every = int(len(train_dataloader) / 10)
+        # ==============================================================================================================
+        # Converting to iterator for speedup
+        # ==============================================================================================================
+        train_loader_iter = iter(train_dataloader)
+        # for batch_idx, (inputs, targets) in enumerate(train_dataloader):
+        for batch_idx in range(len(train_dataloader)):
+            try:
+                (inputs, targets) = next(train_loader_iter)
+            except StopIteration:
+                train_loader_iter = iter(train_dataloader)
+                (inputs, targets) = next(train_loader_iter)
+            # ------------------------------------------------------------------------------------------------------
+            # Zero gradient
+            # ------------------------------------------------------------------------------------------------------
+            self.optimizer.zero_grad()
+            # ------------------------------------------------------------------------------------------------------
+            # Compute forward pass
+            # ------------------------------------------------------------------------------------------------------
+            outputs = self.model(inputs)
+            # ------------------------------------------------------------------------------------------------------
+            # Compute the loss w.r.t the criterion
+            # ------------------------------------------------------------------------------------------------------
+            loss = self.criterion(outputs, targets)
+            # ------------------------------------------------------------------------------------------------------
+            # Backward pass
+            # ------------------------------------------------------------------------------------------------------
+            loss.backward()
+            # ------------------------------------------------------------------------------------------------------
+            # Step optimizer
+            # ------------------------------------------------------------------------------------------------------
+            self.optimizer.step()
+            # ------------------------------------------------------------------------------------------------------
+            # Update total loss and accuracy
+            # ------------------------------------------------------------------------------------------------------
+            total_loss  += loss.item()
+            nof_samples += targets.shape[0]
 
-        for batch_idx, (inputs, targets) in enumerate(train_dataloader):
-            """INSERT YOUR CODE HERE."""
+            correct      = int((torch.argmax(outputs, dim=1) == targets).sum())
+            correct_labeled_samples += correct
+
+            avg_loss = ((avg_loss * batch_idx) + loss.item()) / (batch_idx + 1)
+            accuracy = ((accuracy * batch_idx) + (100*correct/targets.shape[0])) / (batch_idx + 1)
+
             if batch_idx % print_every == 0 or \
                     batch_idx == len(train_dataloader) - 1:
                 print(f'Epoch [{self.epoch:03d}] | Loss: {avg_loss:.3f} | '
@@ -90,14 +132,47 @@ class Trainer:
         nof_samples = 0
         correct_labeled_samples = 0
         print_every = max(int(len(dataloader) / 10), 1)
+        # ==============================================================================================================
+        # Converting to iterator for speedup
+        # ==============================================================================================================
+        dataloader_iter = iter(dataloader)
+        # ==============================================================================================================
+        # Setting model to eval mode
+        # ==============================================================================================================
+        self.model.eval()
+        with torch.no_grad():
+            # for batch_idx, (inputs, targets) in enumerate(train_dataloader):
+            for batch_idx in range(len(dataloader)):
+                try:
+                    (inputs, targets) = next(dataloader_iter)
+                except StopIteration:
+                    train_loader_iter = iter(dataloader)
+                    (inputs, targets) = next(train_loader_iter)
+                # --------------------------------------------------------------------------------------------------
+                # Compute forward pass
+                # --------------------------------------------------------------------------------------------------
+                outputs = self.model(inputs)
+                # --------------------------------------------------------------------------------------------------
+                # Compute the loss w.r.t the criterion
+                # --------------------------------------------------------------------------------------------------
+                loss = self.criterion(outputs, targets)
+                # --------------------------------------------------------------------------------------------------
+                # Update total loss and accuracy
+                # --------------------------------------------------------------------------------------------------
+                total_loss  += loss.item()
+                nof_samples += targets.shape[0]
 
-        for batch_idx, (inputs, targets) in enumerate(dataloader):
-            """INSERT YOUR CODE HERE."""
-            if batch_idx % print_every == 0 or batch_idx == len(dataloader) - 1:
-                print(f'Epoch [{self.epoch:03d}] | Loss: {avg_loss:.3f} | '
-                      f'Acc: {accuracy:.2f}[%] '
-                      f'({correct_labeled_samples}/{nof_samples})')
+                correct = int((torch.argmax(outputs, dim=1) == targets).sum())
+                correct_labeled_samples += correct
 
+                avg_loss = ((avg_loss * batch_idx) + loss.item()) / (batch_idx + 1)
+                accuracy = ((accuracy * batch_idx) + (100 * correct / targets.shape[0])) / (batch_idx + 1)
+
+                if batch_idx % print_every == 0 or batch_idx == len(dataloader) - 1:
+                    print(f'Epoch [{self.epoch:03d}] | Loss: {avg_loss:.3f} | '
+                          f'Acc: {accuracy:.2f}[%] '
+                          f'({correct_labeled_samples}/{nof_samples})')
+        self.model.train()
         return avg_loss, accuracy
 
     def validate(self):
