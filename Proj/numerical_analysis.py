@@ -57,9 +57,47 @@ def get_soft_scores_and_true_labels(dataset, model):
         inference result on the images in the dataset (data in index = 1).
         gt_labels: an iterable holding the samples' ground truth labels.
     """
-    """INSERT YOUR CODE HERE, overrun return."""
-    return torch.rand(100, ), torch.rand(100, ), torch.randint(0, 2, (100, ))
-
+    # ==============================================================================================================
+    # Loading the dataloader
+    # ==============================================================================================================
+    dataloader = DataLoader(dataset, batch_size=210)
+    # ==============================================================================================================
+    # Local variables
+    # ==============================================================================================================
+    all_first_soft_scores  = [0] * len(dataset)
+    all_second_soft_scores = [0] * len(dataset)
+    gt_labels              = [0] * len(dataset)
+    counter                = 0
+    # ==============================================================================================================
+    # Converting to iterator for speedup
+    # ==============================================================================================================
+    dataloader_iter = iter(dataloader)
+    # ==============================================================================================================
+    # Setting model to eval mode
+    # ==============================================================================================================
+    model.eval()
+    with torch.no_grad():
+        # for batch_idx, (inputs, targets) in enumerate(train_dataloader):
+        for batch_idx in range(len(dataloader)):
+            try:
+                (inputs, targets) = next(dataloader_iter)
+            except StopIteration:
+                train_loader_iter = iter(dataloader)
+                (inputs, targets) = next(train_loader_iter)
+            # --------------------------------------------------------------------------------------------------
+            # Compute forward pass
+            # --------------------------------------------------------------------------------------------------
+            outputs = model(inputs)
+            # --------------------------------------------------------------------------------------------------
+            # Updating lists
+            # --------------------------------------------------------------------------------------------------
+            all_first_soft_scores[counter:counter+len(targets)]  = [ii.item() for ii in outputs[:,0]]
+            all_second_soft_scores[counter:counter+len(targets)] = [ii.item() for ii in outputs[:,1]]
+            gt_labels[counter:counter+len(targets)]              = [ii.item() for ii in targets]
+            counter += len(targets)
+    model.train()
+    # return iter(all_first_soft_scores), iter(all_second_soft_scores), iter(gt_labels)
+    return all_first_soft_scores, all_second_soft_scores, gt_labels
 
 def plot_roc_curve(roc_curve_figure,
                    all_first_soft_scores,
@@ -115,7 +153,7 @@ def plot_det_curve(det_curve_figure,
     plt.grid(True)
     plt.xlabel('False Positive Rate (Positive label: 1)')
     plt.ylabel('False Negative Rate (Positive label: 1)')
-    plt.title('DET curve for the first score')
+    plt.title('DET curve')
     axes = det_curve_figure.gca()
     ticks = [0.001, 0.01, 0.05, 0.20, 0.5, 0.80, 0.95, 0.99, 0.999]
     tick_labels = [
