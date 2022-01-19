@@ -7,9 +7,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from torch.utils.data import DataLoader
-
 from common import FIGURES_DIR
 from utils import load_dataset, load_model
+
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -51,8 +53,32 @@ def get_grad_cam_visualization(test_dataset: torch.utils.data.Dataset,
         the true label of that sample (since it is an output of a DataLoader
         of batch size 1, it's a tensor of shape (1,)).
     """
-    """INSERT YOUR CODE HERE, overrun return."""
-    return np.random.rand(256, 256, 3), torch.randint(0, 2, (1,))
+    target_layer = [model.conv3]
+    # ==================================================================================================================
+    # Creating dataloader
+    # ==================================================================================================================
+    loader = iter(DataLoader(test_dataset, batch_size=1, shuffle=True))
+    # ==================================================================================================================
+    # Getting an image and label
+    # ==================================================================================================================
+    (sample, true_label) = next(loader)
+    # ==================================================================================================================
+    # Creating Grad-CAM object
+    # ==================================================================================================================
+    cam = GradCAM(model=model, target_layers=target_layer)
+    # ==================================================================================================================
+    # Generating CAM image
+    # ==================================================================================================================
+    grayscale_cam = cam(input_tensor=sample, target_category=true_label)
+    grayscale_cam = grayscale_cam[0]
+    # ==================================================================================================================
+    # Creating the visualization
+    # ==================================================================================================================
+    rgb_img = torch.permute(sample[0], (1, 2, 0)).cpu().detach().numpy()
+    min_pix = np.min(rgb_img)
+    max_pix = np.max(rgb_img)
+    visualization = show_cam_on_image((rgb_img-min_pix)/(max_pix-min_pix), grayscale_cam, use_rgb=True)
+    return visualization, true_label
 
 
 def main():

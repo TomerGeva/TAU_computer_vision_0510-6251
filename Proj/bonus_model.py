@@ -1,11 +1,12 @@
 """Define your architecture here."""
 import torch
+from torchvision import models
 from models import SimpleNet
 
 
 def my_bonus_model():
-    """Override the model initialization here.
-
+    """
+    Override the model initialization here.
     Do not change the model load line.
     """
     # initialize your model:

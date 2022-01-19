@@ -84,3 +84,7 @@ def get_nof_params(model: nn.Module) -> int:
         The number of model parameters.
     """
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+if __name__ == '__main__':
+    model = load_model(model_name='XceptionBased')
+    print(get_nof_params(model))
