@@ -1,6 +1,5 @@
 """Define your architecture here."""
 import torch
-from torchvision import models
 from models import SimpleNet
 
 
