@@ -61,10 +61,12 @@ def compute_gradient_saliency_maps(samples: torch.tensor,
         saliency: vanilla gradient saliency maps. This should be a tensor of
         shape Bx256x256 where B is the number of images in samples.
     """
+    model = model.to(device)
     # ==================================================================================================================
     # Setting the required_grad_ for the samples
     # ==================================================================================================================
     samples.requires_grad_(True)
+    samples = samples.float().to(device)
     # ==================================================================================================================
     # Computing forward pass
     # ==================================================================================================================
@@ -73,7 +75,7 @@ def compute_gradient_saliency_maps(samples: torch.tensor,
     # Gathering only relevant scores
     # ==================================================================================================================
     row_idx = list(range(len(true_labels)))
-    scores = torch.sum(outputs[row_idx, true_labels])
+    scores  = torch.sum(outputs[row_idx, true_labels])
     # ==================================================================================================================
     # Computing backward pass, gradients can be computed only for scalar values
     # ==================================================================================================================

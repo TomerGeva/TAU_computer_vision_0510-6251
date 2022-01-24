@@ -76,6 +76,7 @@ def get_soft_scores_and_true_labels(dataset, model):
     # Setting model to eval mode
     # ==============================================================================================================
     model.eval()
+    model = model.to(device)
     with torch.no_grad():
         # for batch_idx, (inputs, targets) in enumerate(train_dataloader):
         for batch_idx in range(len(dataloader)):
@@ -84,6 +85,8 @@ def get_soft_scores_and_true_labels(dataset, model):
             except StopIteration:
                 train_loader_iter = iter(dataloader)
                 (inputs, targets) = next(train_loader_iter)
+            inputs  = inputs.float().to(device)
+            targets = targets.float().to(device)
             # --------------------------------------------------------------------------------------------------
             # Compute forward pass
             # --------------------------------------------------------------------------------------------------

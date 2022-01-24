@@ -48,6 +48,7 @@ class Trainer:
             accuracy across all dataset samples.
         """
         self.model.train()
+        self.model = self.model.to(device)
         total_loss = 0
         avg_loss = 0
         accuracy = 0
@@ -71,6 +72,8 @@ class Trainer:
             except StopIteration:
                 train_loader_iter = iter(train_dataloader)
                 (inputs, targets) = next(train_loader_iter)
+            inputs  = inputs.float().to(device)
+            targets = targets.float().to(device)
             # ------------------------------------------------------------------------------------------------------
             # Zero gradient
             # ------------------------------------------------------------------------------------------------------
@@ -122,7 +125,7 @@ class Trainer:
             (avg_loss, accuracy): tuple containing the average loss and
             accuracy across all dataset samples.
         """
-        self.model.eval()
+        self.model = self.model.to(device)
         dataloader = DataLoader(dataset,
                                 batch_size=self.batch_size,
                                 shuffle=False)
@@ -148,6 +151,8 @@ class Trainer:
                 except StopIteration:
                     train_loader_iter = iter(dataloader)
                     (inputs, targets) = next(train_loader_iter)
+                inputs  = inputs.float().to(device)
+                targets = targets.float().to(device)
                 # --------------------------------------------------------------------------------------------------
                 # Compute forward pass
                 # --------------------------------------------------------------------------------------------------
