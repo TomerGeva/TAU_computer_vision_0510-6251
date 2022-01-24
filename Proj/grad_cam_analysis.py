@@ -63,10 +63,12 @@ def get_grad_cam_visualization(test_dataset: torch.utils.data.Dataset,
     # Getting an image and label
     # ==================================================================================================================
     (sample, true_label) = next(loader)
+    sample      = sample.float().to(device)
+    true_label  = true_label.float().to(device)
     # ==================================================================================================================
     # Creating Grad-CAM object
     # ==================================================================================================================
-    cam = GradCAM(model=model, target_layers=target_layer)
+    cam = GradCAM(model=model, target_layers=target_layer, use_cuda=torch.cuda.is_available())
     # ==================================================================================================================
     # Generating CAM image
     # ==================================================================================================================
