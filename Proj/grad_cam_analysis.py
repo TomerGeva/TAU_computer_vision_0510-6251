@@ -53,6 +53,7 @@ def get_grad_cam_visualization(test_dataset: torch.utils.data.Dataset,
         the true label of that sample (since it is an output of a DataLoader
         of batch size 1, it's a tensor of shape (1,)).
     """
+    model = model.to(device)
     target_layer = [model.conv3]
     # ==================================================================================================================
     # Creating dataloader
